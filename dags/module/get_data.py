@@ -15,7 +15,7 @@ DATABASE = "raw"
 engine = create_engine(f"postgresql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
 
 
-def get_weather_data():
+def get_weather_data(**context):
     while True:
         try:
             # 한국
@@ -103,7 +103,7 @@ def upload_data():
     # Insert data into PostgreSQL database
     if not weather_data.empty:
         weather_data.to_sql(
-            "weather_table", con=engine, if_exists="append", index=False
+            "data.temperature", con=engine, if_exists="append", index=False
         )
         print("Data uploaded successfully.")
     else:

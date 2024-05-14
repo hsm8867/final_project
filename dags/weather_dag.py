@@ -13,15 +13,14 @@ from module import train, get_data
     default_args={"owner": "Astro", "retries": 3},
     tags=["example"],
 )
-def fetch_and_upload():
-    # Fetch weather data from api server
-    weather_data = get_data.get_weather_data()
-    # Upload data to the database
-    get_data.upload_data(weather_data)
-
-
 def weather_pipeline():
     start_task = EmptyOperator(task_id="start_task")
+
+    def fetch_and_upload():
+        # Fetch weather data from api server
+        weather_data = get_data.get_weather_data()
+        # Upload data to the database
+        get_data.upload_data(weather_data)
 
     data_task = PythonOperator(
         task_id="data_task",
