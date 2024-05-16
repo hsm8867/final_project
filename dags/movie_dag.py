@@ -15,15 +15,23 @@ from module import get_data, preprocess_data
 )
 def movie_pipeline():
     start_task = EmptyOperator(task_id="start_task")
-    get_data_task = PythonOperator(
-        task_id="get_data_task", python_callable=get_data.get
-    )
-    preprocess_task = PythonOperator(
-        task_id="preprocess_task", python_callable=preprocess_data.preprocess
-    )
+
+    @task
+    def get_data_task(**kwargs):
+        data = get_data.get(**kwargs)
+        return data
+
+    @task
+    def preprocess_task(data_dict):
+        processed_data = preprocess_data.preprocess(data_dict)
+        return processed_data
+
     end_task = EmptyOperator(task_id="end_task")
 
-    start_task >> get_data_task >> preprocess_task >> end_task
+    data = get_data_task()
+    processed_data = preprocess_task(data)
+
+    start_task >> data >> processed_data >> end_task
 
 
 movie_pipeline()

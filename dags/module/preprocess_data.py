@@ -3,7 +3,11 @@ import datetime
 from datetime import timedelta
 
 
-def preprocess(df):
+def preprocess(df_dict):
+
+    # dictionary를 DataFrame으로 변환
+    df = pd.DataFrame.from_dict(df_dict)
+
     # 불필요한 공백 데이터 제거
     df = df[df["openDt"] != " "]
 
@@ -60,4 +64,4 @@ def preprocess(df):
         ]
     ]
 
-    return data
+    return data.to_dict()
