@@ -42,5 +42,5 @@ def process_data(df):
     df_search = df[df['date'] == df['dateAfter7Days']]
     data = pd.merge(df_search, y, on='movieCd', how='left')
     data = data[['showCnt','scrnCnt','audiAcc','sameOpenDtCnt','showAcc','scrnAcc','total']]
-    
+    data['sameOpenDtCnt'] = data['sameOpenDtCnt'].astype('int')
     return data
