@@ -3,7 +3,7 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from pendulum import datetime
 
-from module import get_data
+from module import get_data, preprocess_data
 
 
 @dag(
@@ -15,13 +15,23 @@ from module import get_data
 )
 def movie_pipeline():
     start_task = EmptyOperator(task_id="start_task")
-    train_task = PythonOperator(
-        task_id="train_task",
-        python_callable=get_data.get,
-    )
+
+    @task
+    def get_data_task(**kwargs):
+        data = get_data.get(**kwargs)
+        return data
+
+    @task
+    def preprocess_task(data_dict):
+        processed_data = preprocess_data.preprocess(data_dict)
+        return processed_data
+
     end_task = EmptyOperator(task_id="end_task")
 
-    start_task >> train_task >> end_task
+    data = get_data_task()
+    processed_data = preprocess_task(data)
+
+    start_task >> data >> processed_data >> end_task
 
 
 movie_pipeline()
