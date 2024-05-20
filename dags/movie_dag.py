@@ -16,26 +16,11 @@ from module import get_data, preprocess_data, train, load_data
 def movie_pipeline():
     start_task = EmptyOperator(task_id="start_task")
 
-    @task
-    def load_data_task(**kwargs):
-        data = load_data.load(**kwargs)
-        return data
-
-    @task
-    def preprocess_task(data_dict):
-        processed_data = preprocess_data.preprocess(data_dict)
-        return processed_data
-
-    @task
-    def train_task(processed_data):
-        train.train_fn(processed_data)
+    train_task = PythonOperator(task_id="train_task", python_callable=train.train_fn)
 
     end_task = EmptyOperator(task_id="end_task")
 
-    data = load_data_task()
-    processed_data = preprocess_task(data)
-
-    start_task >> data >> processed_data >> train_task(processed_data) >> end_task
+    start_task >> train_task >> end_task
 
 
 movie_pipeline()
