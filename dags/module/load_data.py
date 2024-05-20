@@ -1,7 +1,6 @@
+# load_data.py
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-
 import pandas as pd
-
 
 def load(**context):
     hook = PostgresHook(postgres_conn_id="postgres_default")

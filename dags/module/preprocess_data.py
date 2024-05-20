@@ -1,7 +1,7 @@
+# preprocess.py
 import pandas as pd
 import datetime
 from datetime import timedelta
-
 
 def add_7_days(date_str):
     try:
@@ -10,9 +10,7 @@ def add_7_days(date_str):
     except ValueError:
         return None
 
-
 def preprocess(df_dict):
-
     # dictionary를 DataFrame으로 변환
     df = pd.DataFrame.from_dict(df_dict)
 

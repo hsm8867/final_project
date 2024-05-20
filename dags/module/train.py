@@ -1,3 +1,4 @@
+# train.py
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
@@ -7,12 +8,20 @@ import optuna
 from optuna.storages import RDBStorage
 import numpy as np
 from sklearn.model_selection import KFold
-from xgboost import XGBRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 
-def train_fn(preprocessed_data_dict):
-    # dictionary를 DataFrame으로 변환
+from module.load_data import load
+from module.preprocess_data import preprocess
+
+def train_fn(**context):
+    # Load data
+    raw_data_dict = load(**context)
+    
+    # Preprocess data
+    preprocessed_data_dict = preprocess(raw_data_dict)
+
+    # Convert dictionary to DataFrame
     data = pd.DataFrame.from_dict(preprocessed_data_dict)
     y = data["total"]
     data = data.drop(columns=["total"])
