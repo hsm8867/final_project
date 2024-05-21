@@ -3,7 +3,7 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from pendulum import datetime
 
-from module import get_data, preprocess_data, train, load_data
+from module import train
 
 
 @dag(
