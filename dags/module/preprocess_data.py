@@ -44,7 +44,7 @@ def preprocess(df_dict):
 
     # showAcc, scrnAcc 계산
     for i in range(len(df)):
-        row = df.iloc[i, :]
+        row = df.iloc[i, :]  # apply 쓰자
         movieCd = row["moviecd"]
         openDt = row["opendt"]
         df_search = df[
