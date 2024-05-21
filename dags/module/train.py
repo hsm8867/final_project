@@ -22,10 +22,13 @@ from mlflow.store.artifact.runs_artifact_repo import RunsArtifactRepository
 
 import datetime
 from datetime import timedelta
+import os
 
 
 def train_fn(**context):
-    mlflow.set_tracking_uri("http://10.178.0.2:5000")
+    os.environ["AWS_ACCESS_KEY_ID"] = ACCESS_KEY_ID
+    os.environ["AWS_SECRET_ACCESS_KEY"] = SECRET_ACCESS_KEY
+    os.environ["MLFLOW_S3_ENDPOINT_URL"] = ENDPOINT_URL
     mlflow.set_experiment("movie_model")
 
     processed_data = preprocess(load())
