@@ -25,12 +25,8 @@ from datetime import timedelta
 import os
 
 
-def train_fn(**context):
-    os.environ["AWS_ACCESS_KEY_ID"] = ACCESS_KEY_ID
-    os.environ["AWS_SECRET_ACCESS_KEY"] = SECRET_ACCESS_KEY
-    os.environ["MLFLOW_S3_ENDPOINT_URL"] = ENDPOINT_URL
-    mlflow.set_experiment("movie_model")
-
+def train_fn(experiment_name: str, **context):
+    mlflow.set_experiment(experiment_name)
     processed_data = preprocess(load())
     # dictionary를 DataFrame으로 변환
     data = pd.DataFrame.from_dict(processed_data)
@@ -100,7 +96,7 @@ def train_fn(**context):
         study_name="movies", direction="minimize", storage=storage, load_if_exists=True
     )
 
-    study.optimize(objective, n_trials=100)
+    study.optimize(objective, n_trials=3)
     best_params = study.best_params
 
     model = XGBRegressor(**best_params)

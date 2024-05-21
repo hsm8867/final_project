@@ -16,7 +16,11 @@ from module import train
 def movie_pipeline():
     start_task = EmptyOperator(task_id="start_task")
 
-    train_task = PythonOperator(task_id="train_task", python_callable=train.train_fn)
+    train_task = PythonOperator(
+        task_id="train_task",
+        python_callable=train.train_fn,
+        op_kwargs={"experiment_name": "movie_model"},
+    )
 
     end_task = EmptyOperator(task_id="end_task")
 
