@@ -40,12 +40,12 @@ def get(**context):
         data,
         columns=[
             "date",
-            "movieCd",
-            "movieNm",
-            "showCnt",
-            "scrnCnt",
-            "openDt",
-            "audiAcc",
+            "moviecd",
+            "movienm",
+            "showcnt",
+            "scrncnt",
+            "opendt",
+            "audiacc",
         ],
     )
 

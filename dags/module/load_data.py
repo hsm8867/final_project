@@ -13,5 +13,5 @@ def load(**context):
 
     data = pd.read_sql(stmt, conn)
 
-    # 데이터프레임을 딕셔너리로 변환하여 반환
-    return data.to_dict(orient="list")
+    
+    return data

@@ -1,75 +1,56 @@
 import pandas as pd
-import datetime
-from datetime import timedelta
+import numpy as np
+import pytz
+from datetime import datetime, timedelta
 
+def preprocess(df):
+    df.replace(' ',np.nan, inplace = True)
+    df.dropna(inplace = True)
+    # datetime 형식 변환
+    df[['date', 'opendt']] = df[['date', 'opendt']].apply(pd.to_datetime, format='%Y-%m-%d')
+    #
+    df['dateAfter7Days'] = df['opendt'] + pd.Timedelta(days=7)
 
-def add_7_days(date_str):
-    try:
-        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-        return (date_obj + timedelta(days=7)).date()  # 날짜 형식으로 반환
-    except ValueError:
-        return None
-
-
-def preprocess(df_dict):
-
-    # dictionary를 DataFrame으로 변환
-    df = pd.DataFrame.from_dict(df_dict)
-
-    # 불필요한 공백 데이터 제거 및 opendt 열의 None 값 처리
-    df = df[df["opendt"].notna()]
-    df["opendt"] = df["opendt"].astype(str)
-
-    # opendt 열을 문자열로 변환
-    df["opendt"] = df["opendt"].astype(str)
-
-    # 같은 개봉일 영화 수 초기화
-    df["sameOpenDtCnt"] = ""
-
-    for i in range(len(df)):
-        row = df.iloc[i, :]
-        movieCd = row["moviecd"]
-        opendt = row["opendt"]
-        df_search = df[df["opendt"].str.match(opendt)]
-        df_groupby = df_search.groupby(["moviecd"])
-        row["sameOpenDtCnt"] = len(df_groupby)
-        df.iloc[i] = row
-
-    # 7일 뒤 날짜 계산 및 새로운 컬럼 생성
-    df["dateAfter7Days"] = df["opendt"].apply(add_7_days)
-
+    # 같은 개봉일 영화 수 계산
+    df["sameOpenDtCnt"] = df.groupby("opendt")["moviecd"].transform("nunique")
     # showAcc, scrnAcc 초기화
-    df["showAcc"] = 0
-    df["scrnAcc"] = 0
+    df["showAcc"] = np.nan
+    df["scrnAcc"] = np.nan
 
-    # showAcc, scrnAcc 계산
-    for i in range(len(df)):
-        row = df.iloc[i, :]  # apply 쓰자
-        movieCd = row["moviecd"]
-        openDt = row["opendt"]
-        df_search = df[
-            (df["date"] <= df["dateAfter7Days"]) & (df["moviecd"] == movieCd)
-        ]
-        row["showAcc"] = df_search["showcnt"].sum()
-        row["scrnAcc"] = df_search["scrncnt"].sum()
-        df.iloc[i] = row
+    # 각 moviecd별로 chowcnt와 scrncnt의 합계를 계산하여 showAcc와 scrnAcc에 할당
+    for moviecd in df['moviecd'].unique():
+        # 해당 moviecd에 대한 데이터를 필터링
+        subset = df[df['moviecd'] == moviecd]
+        if not subset.empty:
+            # opendt부터 dateAfter7Days까지의 기간에 대한 필터링
+            mask = (df['date'] >= subset['opendt'].values[0]) & (df['date'] <= subset['dateAfter7Days'].values[0])
+            filtered_data = df[mask & (df['moviecd'] == moviecd)]
 
-    # 중복 제거 및 마지막 날짜 값만 남기기
-    y = df.sort_values(by="date").drop_duplicates(subset="movienm", keep="last")
-    y = y[["moviecd", "audiacc"]]
-    y.rename(columns={"audiacc": "total"}, inplace=True)
-    df_search = df[df["date"] == df["dateAfter7Days"]]
-    data = pd.merge(df_search, y, on="moviecd", how="left")
-    data = data[
-        [
-            "showcnt",
-            "scrncnt",
-            "audiacc",
-            "sameOpenDtCnt",
-            "showAcc",
-            "scrnAcc",
-            "total",
-        ]
-    ]
+            if not filtered_data.empty:
+                chowcnt_sum = filtered_data['showcnt'].sum()
+                scrncnt_sum = filtered_data['scrncnt'].sum()
 
-    return data.to_dict()
+                df.loc[df['moviecd'] == moviecd, 'showAcc'] = chowcnt_sum
+                df.loc[df['moviecd'] == moviecd, 'scrnAcc'] = scrncnt_sum
+
+    df.dropna(inplace = True)
+
+    # 총 관객 수 관련(target 변수)
+    tz_kst = pytz.timezone('Asia/Seoul')
+    today_kst = datetime.now(tz_kst)
+
+    yesterday_kst = today_kst - timedelta(days=1)
+    yesterday_str = yesterday_kst.strftime('%Y-%m-%d')
+
+    # 마지막 관측값만 추출(total 변수)
+    last = df.sort_values('date').groupby('moviecd').last().reset_index()[['date', 'moviecd', 'audiacc']]
+    last = last[last['date'] != yesterday_str]
+    last = last.rename(columns = {'audiacc':'total'})
+    last.drop(columns = 'date',inplace = True)
+
+    df = pd.merge(df,last,how = 'left', on = 'moviecd')
+    df = df[df["date"] == df["dateAfter7Days"]]
+    df.dropna(inplace = True)
+    df = df[["showcnt", "scrncnt", "audiacc", "sameOpenDtCnt", "showAcc", "scrnAcc", "total"]]
+
+    return df

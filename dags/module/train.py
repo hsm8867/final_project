@@ -27,9 +27,8 @@ import os
 
 def train_fn(experiment_name: str, **context):
     mlflow.set_experiment(experiment_name)
-    processed_data = preprocess(load())
-    # dictionary를 DataFrame으로 변환
-    data = pd.DataFrame.from_dict(processed_data)
+    _data=load()
+    data = preprocess(_data)
     y = data["total"]
     X = data.drop(columns=["total"])
 

@@ -21,7 +21,7 @@ services:
       - -c
       - |
         mlflow server \
-        --backend-store-uri postgresql://postgres:mlecourse@34.64.242.50/mlflow_db \
+        --backend-store-uri postgresql://postgres:mlecourse@34.64.47.40/mlflow_db \
         --default-artifact-root s3://mlflow/ \
         --host 0.0.0.0
 
