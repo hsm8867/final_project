@@ -16,6 +16,10 @@ from app.core.config import config, is_local
 class Base(DeclarativeBase): ...
 
 
+def get_session_id():
+    return context.get("session_id")
+
+
 engine = create_async_engine(
     config.DB_URL, pool_size=10, max_overflow=5, echo=is_local(), pool_pre_ping=True
 )
@@ -24,7 +28,9 @@ async_session_factory = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
 
-AsyncScopedSession = async_scoped_session(async_session_factory, scopefunc=current_task)
+AsyncScopedSession = async_scoped_session(
+    async_session_factory, scopefunc=get_session_id
+)
 
 
 async def get_db():
