@@ -3,8 +3,7 @@ from typing import Optional
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import Integer, String, Date
-
-Base = declarative_base()
+from app.core.db.session import Base
 
 
 class Movie(Base):
