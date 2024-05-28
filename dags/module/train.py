@@ -27,7 +27,7 @@ import os
 
 def train_fn(experiment_name: str, **context):
     mlflow.set_experiment(experiment_name)
-    _data=load()
+    _data = load()
     data = preprocess(_data)
     y = data["total"]
     X = data.drop(columns=["total"])
@@ -123,67 +123,3 @@ def train_fn(experiment_name: str, **context):
     )
 
     return best_params
-
-
-# def create_model_version(model_name: str, **context):
-#     run_id = context["ti"].xcom_pull(key="run_id")
-#     model_uri = context["ti"].xcom_pull(key="model_uri")
-#     eval_metric = context["ti"].xcom_pull(key="eval_metric")
-
-#     # Create Model Version
-
-#     client = MlflowClient()
-#     try:
-#         client.create_registered_model(model_name)
-#     except Exception as e:
-#         print("Model already exists")
-
-#     current_metric = client.get_run(run_id).data.metrics[eval_metric]
-#     model_source = RunsArtifactRepository.get_underlying_uri(model_uri)
-#     model_version = client.create_model_version(
-#     model_name, model_source, run_id, description=f"{eval_metric}: {current_metric}"
-#     )
-
-#     context["ti"].xcom_push(key="model_version", value=model_version.version)
-#     print(f"Done Create model version, model_version: {model_version}")
-
-
-#     def transition_model_stage(model_name: str, **context):
-#         version = context["ti"].xcom_pull(key="model_version")
-#         eval_metric = context["ti"].xcom_pull(key="eval_metric")
-
-#         client = MlflowClient()
-#         production_model = None
-#         current_model = client.get_model_version(model_name, version)
-
-#         filter_string = f"name='{current_model.name}'"
-#         results = client.search_model_versions(filter_string)
-
-#         for mv in results:
-#             if mv.current_stage == "Production":
-#                 production_model = mv
-
-#             if production_model is None:
-#                 client.transition_model_version_stage(
-#                     current_model.name, current_model.version, "Production"
-#                 )
-#                 production_model = current_model
-#             else:
-#                 current_metric = client.get_run(current_model.run_id).data.metrics[eval_metric]
-#                 production_metric = client.get_run(production_model.run_id).data.metrics[
-#                     eval_metric
-#                 ]
-
-#                 if current_metric > production_metric:
-#                     client.transition_model_version_stage(
-#                         current_model.name,
-#                         current_model.version,
-#                         "Production",
-#                         archive_existing_versions=True,
-#                     )
-#                     production_model = current_model
-
-#             context["ti"].xcom_push(key="production_version", value=production_model.version)
-#             print(
-#             f"Done Deploy Production_Model, production_version: {production_model.version}"
-#             )

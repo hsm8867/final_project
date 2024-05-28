@@ -1,14 +1,23 @@
 [tool.poetry]
-name = "final"
+name = "movie-api"
 version = "0.1.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = ["SuminHam <hsm4317@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-torch = "^2.3.0"
-scikit-learn = "^1.4.2"
+fastapi = "^0.111.0"
+scikit-learn = "^1.5.0"
+mlflow = "1.27.0"
+psycopg2-binary = "^2.9.9"
+boto3 = "^1.34.110"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.29"}
+uvicorn = {extras = ["standard"], version = "^0.29.0"}
+pydantic-settings = "^2.2.1"
+asyncpg = "^0.29.0"
+starlette-context = "^0.3.6"
+redis = "^5.0.4"
 
 
 [build-system]
