@@ -9,7 +9,7 @@ from app.models.schemas.common import BaseResponse, HttpResponse, ErrorResponse
 from app.models.schemas.movie_ import (
     MovieResp,
 )
-from app.models.db.movie_model import Movie
+from app.models.db.movie_model import Movie, Movie_info
 
 from app.core.redis import redis_cache, key_builder
 from app.core.logger import logger
@@ -68,8 +68,15 @@ async def read_movie_by_name(movie_name: str) -> BaseResponse[MovieResp]:
     else:
         logger.debug("Cache miss")
         async with AsyncScopedSession() as session:
-            stmt = select(Movie).where(Movie.movienm == movie_name)
+            stmt = (
+                select(Movie, Movie_info.repgenrenm)
+                .outerjoin(Movie_info, Movie.moviecd == Movie_info.moviecd)
+                .where(Movie.movienm == movie_name)
+                .order_by(Movie.date)
+                .limit(7)
+            )
             result = (await session.execute(stmt)).scalar()
+            print(result)
 
             if result:
                 await redis_cache.set(_key, result, ttl=60)

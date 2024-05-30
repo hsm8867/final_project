@@ -32,58 +32,5 @@ def load_model():
     print("Loading model")
     # run_id = get_latest_run_id(config.EXPERIMENT_NAME)
 
-    mlflow.set_tracking_uri(config.MLFLOW_S3_ENDPOINT_URL)
-    model_uri = "s3://mlflow/1/c916bd20aaec424c91ede491068e533c/artifacts/model"
-    model = mlflow.pyfunc.load_model(model_uri)
+    model = mlflow.sklearn.load_model("models:/{config.EXPERIMENT_NAME}/production")
     return model
-
-
-def preprocess(df):
-    df.replace(" ", np.nan, inplace=True)
-    df.dropna(inplace=True)
-    df[["date", "opendt"]] = df[["date", "opendt"]].apply(
-        pd.to_datetime, format="%Y-%m-%d"
-    )
-    df["dateAfter7Days"] = df["opendt"] + pd.Timedelta(days=7)
-    df["sameOpenDtCnt"] = df.groupby("opendt")["moviecd"].transform("nunique")
-    df["showAcc"] = np.nan
-    df["scrnAcc"] = np.nan
-
-    for moviecd in df["moviecd"].unique():
-        subset = df[df["moviecd"] == moviecd]
-        if not subset.empty:
-            mask = (df["date"] >= subset["opendt"].values[0]) & (
-                df["date"] <= subset["dateAfter7Days"].values[0]
-            )
-            filtered_data = df[mask & (df["moviecd"] == moviecd)]
-
-            if not filtered_data.empty:
-                chowcnt_sum = filtered_data["showcnt"].sum()
-                scrncnt_sum = filtered_data["scrncnt"].sum()
-
-                df.loc[df["moviecd"] == moviecd, "showAcc"] = chowcnt_sum
-                df.loc[df["moviecd"] == moviecd, "scrnAcc"] = scrncnt_sum
-
-    df.dropna(inplace=True)
-    tz_kst = pytz.timezone("Asia/Seoul")
-    today_kst = datetime.now(tz_kst)
-    yesterday_kst = today_kst - timedelta(days=1)
-    yesterday_str = yesterday_kst.strftime("%Y-%m-%d")
-
-    last = (
-        df.sort_values("date")
-        .groupby("moviecd")
-        .last()
-        .reset_index()[["date", "moviecd", "audiacc"]]
-    )
-    last = last[last["date"] != yesterday_str]
-    last = last.rename(columns={"audiacc": "total"})
-    last.drop(columns="date", inplace=True)
-
-    df = pd.merge(df, last, how="left", on="moviecd")
-    df = df[df["date"] == df["dateAfter7Days"]]
-    df.dropna(inplace=True)
-    # df = df[["showcnt", "scrncnt", "audiacc", "sameOpenDtCnt", "showAcc", "scrnAcc", "total"]]
-    df = df[["showcnt", "scrncnt", "audiacc", "sameOpenDtCnt", "showAcc", "scrnAcc"]]
-
-    return df
