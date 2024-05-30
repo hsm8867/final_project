@@ -11,13 +11,8 @@ def preprocess(df):
     #
     df['dateAfter7Days'] = df['opendt'] + pd.Timedelta(days=7)
 
-    # 같은 개봉일 영화 수 계산
-    df["sameOpenDtCnt"] = df.groupby("opendt")["moviecd"].transform("nunique")
-    # showAcc, scrnAcc 초기화
-    df["showAcc"] = np.nan
-    df["scrnAcc"] = np.nan
 
-    # 각 moviecd별로 chowcnt와 scrncnt의 합계를 계산하여 showAcc와 scrnAcc에 할당
+    # 각 moviecd별로 showcnt와 scrncnt의 합계를 계산하여 showAcc와 scrnAcc에 할당
     for moviecd in df['moviecd'].unique():
         # 해당 moviecd에 대한 데이터를 필터링
         subset = df[df['moviecd'] == moviecd]
@@ -50,7 +45,10 @@ def preprocess(df):
 
     df = pd.merge(df,last,how = 'left', on = 'moviecd')
     df = df[df["date"] == df["dateAfter7Days"]]
+
     df.dropna(inplace = True)
-    df = df[["showcnt", "scrncnt", "audiacc", "sameOpenDtCnt", "showAcc", "scrnAcc", "total"]]
+
+    df = df[["audiacc", "showAcc", "scrnAcc", "repgenrenm", "total"]]
+
 
     return df
