@@ -19,7 +19,11 @@ class Config(BaseSettings):
     DB_URL: ClassVar[str] = (
         "postgresql+asyncpg://postgres:mlecourse@34.64.174.26:5432/raw"
     )
-
+    EXPERIMENT_NAME: str = "1"
+    MODEL_STAGE: str = "production"
+    AWS_ACCESS_KEY_ID: str = "mlflow_admin"
+    AWS_SECRET_ACCESS_KEY: str = "mlflow_admin"
+    MLFLOW_S3_ENDPOINT_URL: str = "http://10.178.0.3:9000"
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
 
@@ -37,8 +41,7 @@ class Config(BaseSettings):
         }
 
 
-class TestConfig(Config):
-    DB_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/postgres"
+class TestConfig(Config): ...
 
 
 class LocalConfig(Config): ...
