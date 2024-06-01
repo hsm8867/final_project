@@ -36,13 +36,22 @@ async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
             logger.debug("Cache miss")
             async with AsyncScopedSession() as session:
                 stmt = (
-                    select(Movie, Movie_info.repgenrenm)
+                    select(
+                        Movie.date,
+                        Movie.moviecd,
+                        Movie.movienm,
+                        Movie.showcnt,
+                        Movie.scrncnt,
+                        Movie.opendt,
+                        Movie.audiacc,
+                        Movie_info.repgenrenm,
+                    )
                     .outerjoin(Movie_info, Movie.moviecd == Movie_info.moviecd)
                     .where(Movie.date == date)
                     .order_by(Movie.date)
                     .limit(7)
                 )
-                result = (await session.execute(stmt)).scalars().all()
+                result = (await session.execute(stmt)).all()
 
                 if result:
                     await redis_cache.set(_key, result, ttl=60)
@@ -50,20 +59,20 @@ async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
         if result is None:
             raise error.MovieNotFoundException()
 
-        return HttpResponse(
-            content=[
-                MovieResp(
-                    date=movie.date,
-                    moviecd=movie.moviecd,
-                    movienm=movie.movienm,
-                    showcnt=movie.showcnt,
-                    scrncnt=movie.scrncnt,
-                    opendt=movie.opendt,
-                    audiacc=movie.audiacc,
-                    # repgenrenm=repgenrenm.repgenrenm
-                )
-                for movie in result
-            ]
-        )
+        movies = [
+            MovieResp(
+                date=row.date,
+                moviecd=row.moviecd,
+                movienm=row.movienm,
+                showcnt=row.showcnt,
+                scrncnt=row.scrncnt,
+                opendt=row.opendt,
+                audiacc=row.audiacc,
+                repgenrenm=row.repgenrenm,
+            )
+            for row in result
+        ]
+
+        return HttpResponse(content=movies)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
