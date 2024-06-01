@@ -15,6 +15,7 @@ import mlflow
 from module.load_data import load
 from module.preprocess_data import preprocess
 
+
 def train_fn(experiment_name: str, **context):
     mlflow.set_experiment(experiment_name)
     data = load()
@@ -24,17 +25,22 @@ def train_fn(experiment_name: str, **context):
     X = data.drop(columns=["total"])
 
     x_train, x_valid, y_train, y_valid = train_test_split(
-        X, y, test_size=0.3, shuffle=True)
+        X, y, test_size=0.3, shuffle=True
+    )
     x_train = x_train.reset_index(drop=True)
     x_valid = x_valid.reset_index(drop=True)
 
-    cat_columns = ['repgenrenm']
+    cat_columns = ["repgenrenm"]
     num_columns = [c for c in X.columns if c not in cat_columns]
 
     preprocessor = ColumnTransformer(
         transformers=[
             ("scaler", StandardScaler(), num_columns),
-            ("encoding", OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_columns)
+            (
+                "encoding",
+                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                cat_columns,
+            ),
         ]
     )
 
@@ -87,7 +93,7 @@ def train_fn(experiment_name: str, **context):
     pipeline = Pipeline([("preprocessor", preprocessor), ("model", model)])
 
     metrics = {
-        "mse": mean_squared_error(y_valid, model.predict(x_valid), squared=False)
+        "rmse": mean_squared_error(y_valid, model.predict(x_valid), squared=False)
     }
 
     with mlflow.start_run():
@@ -97,7 +103,7 @@ def train_fn(experiment_name: str, **context):
 
     context["ti"].xcom_push(key="run_id", value=model_info.run_id)
     context["ti"].xcom_push(key="model_uri", value=model_info.model_uri)
-    context["ti"].xcom_push(key="eval_metric", value="mse")
+    context["ti"].xcom_push(key="eval_metric", value="rmse")
     print(
         f"Done Train model, run_id: {model_info.run_id}, model_uri: {model_info.model_uri}"
     )
