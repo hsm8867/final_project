@@ -20,6 +20,7 @@ class Config(BaseSettings):
         "postgresql+asyncpg://postgres:mlecourse@34.64.174.26:5432/raw"
     )
     EXPERIMENT_NAME: str = "1"
+    MODEL_NAME: str = "movie_model"
     MODEL_STAGE: str = "production"
     AWS_ACCESS_KEY_ID: str = "mlflow_admin"
     AWS_SECRET_ACCESS_KEY: str = "mlflow_admin"

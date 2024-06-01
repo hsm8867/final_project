@@ -1,7 +1,7 @@
 from uuid import uuid4
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import select, insert, update, delete
 
 from app.core.db.session import AsyncScopedSession
@@ -15,83 +15,55 @@ from app.core.redis import redis_cache, key_builder
 from app.core.logger import logger
 from app.core.errors import error
 
+from datetime import datetime
+
 router = APIRouter()
 
 
 @router.get(
-    "/list",
-    response_model=BaseResponse[List[MovieResp]],
-    responses={400: {"model": ErrorResponse}},
-)
-async def movie_list_by_name(movie_name: str) -> BaseResponse[List[MovieResp]]:
-    _key = key_builder("read_movie_list_by_name")
-
-    if await redis_cache.exists(_key):
-        logger.debug("Cache hit")
-        result = await redis_cache.get(_key)
-    else:
-        logger.debug("Cache miss")
-        async with AsyncScopedSession() as session:
-            stmt = select(Movie).where(Movie.movienm == movie_name)
-            result = (await session.execute(stmt)).scalars().all()
-
-        if result:
-            await redis_cache.set(_key, result, ttl=60)
-
-    return HttpResponse(
-        content=[
-            MovieResp(
-                date=result.date,
-                moviecd=result.moviecd,
-                movienm=result.movienm,
-                showcnt=result.showcnt,
-                scrncnt=result.scrncnt,
-                opendt=result.opendt,
-                audiacc=result.audiacc,
-            )
-            for result in result
-        ]
-    )
-
-
-@router.get(
-    "/{movie_name}",
+    "/movies_list",
     response_model=BaseResponse,
     responses={400: {"model": ErrorResponse}},
 )
-async def read_movie_by_name(movie_name: str) -> BaseResponse[MovieResp]:
-    _key = key_builder("read_movie_by_name")
+async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
+    try:
+        _key = key_builder("read_movie_by_date")
 
-    if await redis_cache.exists(_key):
-        logger.debug("Cache hit")
-        result = await redis_cache.get(_key)
-    else:
-        logger.debug("Cache miss")
-        async with AsyncScopedSession() as session:
-            stmt = (
-                select(Movie, Movie_info.repgenrenm)
-                .outerjoin(Movie_info, Movie.moviecd == Movie_info.moviecd)
-                .where(Movie.movienm == movie_name)
-                .order_by(Movie.date)
-                .limit(7)
-            )
-            result = (await session.execute(stmt)).scalar()
-            print(result)
+        if await redis_cache.exists(_key):
+            logger.debug("Cache hit")
+            result = await redis_cache.get(_key)
+        else:
+            logger.debug("Cache miss")
+            async with AsyncScopedSession() as session:
+                stmt = (
+                    select(Movie, Movie_info.repgenrenm)
+                    .outerjoin(Movie_info, Movie.moviecd == Movie_info.moviecd)
+                    .where(Movie.date == date)
+                    .order_by(Movie.date)
+                    .limit(7)
+                )
+                result = (await session.execute(stmt)).scalars().all()
 
-            if result:
-                await redis_cache.set(_key, result, ttl=60)
+                if result:
+                    await redis_cache.set(_key, result, ttl=60)
 
-    if result is None:
-        raise error.MovieNotFoundException()
+        if result is None:
+            raise error.MovieNotFoundException()
 
-    return HttpResponse(
-        content=MovieResp(
-            date=result.date,
-            moviecd=result.moviecd,
-            movienm=result.movienm,
-            showcnt=result.showcnt,
-            scrncnt=result.scrncnt,
-            opendt=result.opendt,
-            audiacc=result.audiacc,
+        return HttpResponse(
+            content=[
+                MovieResp(
+                    date=movie.date,
+                    moviecd=movie.moviecd,
+                    movienm=movie.movienm,
+                    showcnt=movie.showcnt,
+                    scrncnt=movie.scrncnt,
+                    opendt=movie.opendt,
+                    audiacc=movie.audiacc,
+                    # repgenrenm=repgenrenm.repgenrenm
+                )
+                for movie in result
+            ]
         )
-    )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
