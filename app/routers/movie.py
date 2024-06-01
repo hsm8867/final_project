@@ -75,4 +75,4 @@ async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
 
         return HttpResponse(content=movies)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500)

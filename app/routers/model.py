@@ -8,11 +8,16 @@ from app.utils import load_model, check_movie_count, prepare_data
 from app.models.schemas.model_ import ModelResp, ModelReq
 from app.models.db.movie_model import Movie, Movie_info
 
+from app.core.logger import logger
+
+import numpy as np
+
 router = APIRouter()
 
 
 @router.post("/predict", response_model=ModelResp)
 async def predict(request: ModelReq):
+
     try:
         # Extract movie name from the request
         moviename = request.movienm
@@ -35,24 +40,33 @@ async def predict(request: ModelReq):
                 .limit(7)
             )
             result = (await session.execute(stmt)).all()
-            df = pd.DataFrame([movie.__dict__ for movie in result])
 
-            # 영화 상영이 일주일 이상 됐는지 체크
-            if check_movie_count(df, moviename):
-                # Prepare the data
-                prepared_data = prepare_data(df)
+            audiacc = max(row.audiacc for row in result)
+            showacc = sum(row.showcnt for row in result)
+            scrnacc = sum(row.scrncnt for row in result)
+            repgenrenm = result[0].repgenrenm
 
-                # Load the model
-                model = load_model()
+            df = pd.DataFrame(
+                {
+                    "audiacc": [audiacc],
+                    "showAcc": [showacc],
+                    "scrnAcc": [scrnacc],
+                    "repgenrenm": [repgenrenm],
+                }
+            )
 
-                # Predict using the model with the prepared data
-                result = model.predict(prepared_data)
+            print("DataFrame for prediction:")
+            print(df)
 
-                return ModelResp(target=result.tolist())
-            else:
+            # Load the model
+            model = load_model()
+            try:
+                result = model.predict(df)
+                print(result)
+                return ModelResp(result_=int(result))
+            except Exception as e:
                 raise HTTPException(
-                    status_code=404,
-                    detail=f"Not enough movies with the name '{moviename}'.",
+                    status_code=500, detail=f"Prediction error: {str(e)}"
                 )
 
     except Exception as e:
