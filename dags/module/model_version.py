@@ -1,8 +1,11 @@
 import mlflow
 from mlflow.tracking import MlflowClient
 from mlflow.store.artifact.runs_artifact_repo import RunsArtifactRepository
+import time
+
 
 def create_model_version(model_name: str, **context):
+    time.sleep(10)
     run_id = context["ti"].xcom_pull(key="run_id")
     model_uri = context["ti"].xcom_pull(key="model_uri")
     eval_metric = context["ti"].xcom_pull(key="eval_metric")

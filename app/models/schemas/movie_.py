@@ -15,3 +15,4 @@ class MovieResp:
     scrncnt: int = Field(..., title="scrncnt")
     opendt: datetime = Field(..., title="opendt")
     audiacc: int = Field(..., title="audiacc")
+    # repgenrenm: str = Field(..., title="repgenrenm")

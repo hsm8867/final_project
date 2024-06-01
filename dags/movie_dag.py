@@ -7,6 +7,7 @@ from module import train
 from module.model_version import create_model_version
 from module.transit_model import transition_model_stage
 
+
 @dag(
     start_date=datetime(2024, 1, 1),
     schedule="@daily",
@@ -35,8 +36,7 @@ def movie_pipeline():
 
     end_task = EmptyOperator(task_id="end_task")
 
-    start_task >> [train_task >> model_create_task >> model_transition_task] >> end_task
+    start_task >> train_task >> model_create_task >> model_transition_task >> end_task
 
 
 movie_pipeline()
-
