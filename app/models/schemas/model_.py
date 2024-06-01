@@ -3,7 +3,7 @@ from datetime import datetime
 
 
 class ModelResp(BaseModel):
-    result: int = Field(..., description="Predicted audience")
+    result_: int = Field(..., description="Predicted audience")
 
 
 class ModelReq(BaseModel):
