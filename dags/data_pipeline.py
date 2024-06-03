@@ -3,7 +3,7 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from pendulum import datetime
 
-from module import train
+from module import get_data
 
 
 @dag(
@@ -13,15 +13,22 @@ from module import train
     default_args={"owner": "Astro", "retries": 3},
     tags=["example"],
 )
-def weather_pipeline():
+def data_pipeline():
     start_task = EmptyOperator(task_id="start_task")
-    train_task = PythonOperator(
-        task_id="train_task",
-        python_callable=train.train_fn,
+
+    boxoffice_task = PythonOperator(
+        task_id="box_office",
+        python_callable=get_data.get,
     )
+
+    movieinfo_task = PythonOperator(
+        task_id="movie_info",
+        python_callable=get_data.get,
+    )
+
     end_task = EmptyOperator(task_id="end_task")
 
-    start_task >> train_task >> end_task
+    start_task >> [boxoffice_task] >> end_task
 
 
-weather_pipeline()
+data_pipeline()

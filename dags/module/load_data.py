@@ -11,10 +11,9 @@ def load(**context):
             FROM data.movies m
             LEFT JOIN data.movie_info mi
             ON m.moviecd = mi.moviecd;
- 
+
             """
 
     data = pd.read_sql(stmt, conn)
 
-    
     return data
