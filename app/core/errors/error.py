@@ -1,5 +1,5 @@
 ERROR_400_MOVIE_NOT_FOUND = "40000"
-ERROR_400_CLASS_NOTICE_NOT_FOUND = "40001"
+ERROR_400_MOVIE_NOT_ENOUGH = "40001"
 ERROR_400_CLASS_CREATION_FAILED = "40002"
 ERROR_400_CLASS_NOTICE_CREATION_FAILED = "40003"
 ERROR_400_CLASS_NOTICE_UPDATE_FAILED = "40004"
@@ -15,8 +15,11 @@ class BaseAPIException(Exception):
 
 class MovieNotFoundException(BaseAPIException):
     def __init__(self):
-        super().__init__(code=ERROR_400_MOVIE_NOT_FOUND, message="Class not found")
+        super().__init__(code=ERROR_400_MOVIE_NOT_FOUND, message="Movie not found")
 
+class MovieNotEnoughException(BaseAPIException):
+	def __init__(self):
+		super().__init__(code = ERROR_400_MOVIE_NOT_ENOUGH, message="Movie not enough")
 
 # class ClassCreationFailed(BaseAPIException):
 #     def __init__(self):
