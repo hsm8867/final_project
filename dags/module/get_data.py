@@ -130,6 +130,9 @@ def update_movie_info(**context):
     hook = PostgresHook(postgres_conn_id="postgres_default")
     conn = hook.get_sqlalchemy_engine()
 
-    movie_info.to_sql(
-        "movie_info", conn, schema="data", if_exists="append", index=False
-    )
+    if not movie_info.empty:
+        movie_info.to_sql(
+            "movie_info", conn, schema="data", if_exists="append", index=False
+        )
+    else:
+        print("데이터가 없습니다.")
