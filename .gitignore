@@ -1,4 +1,4 @@
-*.pt
+**/*.pt
 __pycache__
-compose.yaml
-mlflow-compose.yaml
+app/core/config.py
+**/*.yaml
