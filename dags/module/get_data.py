@@ -1,5 +1,6 @@
 import requests
 from datetime import datetime, timedelta
+import time
 import pandas as pd
 import pytz
 from airflow.providers.postgres.hooks.postgres import PostgresHook
@@ -68,13 +69,6 @@ def get(**context):
     df.to_sql("movies", conn, schema="data", if_exists="append", index=False)
 
 
-import requests
-import time
-import pandas as pd
-import pytz
-from datetime import datetime, timedelta
-
-
 def fetch_movie_data(targetYear, key):
     all_movies = []
     i = 1  # start page
@@ -126,8 +120,16 @@ def process_movie_info(movies):
     return movie_info
 
 
-key = "12d75fdeab5071a1fff3090078f5701e"
-targetYear = 2024
+def update_movie_info(**context):
+    key = "12d75fdeab5071a1fff3090078f5701e"
+    targetYear = 2024
 
-movies = fetch_movie_data(targetYear, key)
-movie_info = process_movie_info(movies)
+    movies = fetch_movie_data(targetYear, key)
+    movie_info = process_movie_info(movies)
+
+    hook = PostgresHook(postgres_conn_id="postgres_default")
+    conn = hook.get_sqlalchemy_engine()
+
+    movie_info.to_sql(
+        "movie_info", conn, schema="data", if_exists="append", index=False
+    )

@@ -23,12 +23,12 @@ def data_pipeline():
 
     movieinfo_task = PythonOperator(
         task_id="movie_info",
-        python_callable=get_data.get,
+        python_callable=get_data.update_movie_info,
     )
 
     end_task = EmptyOperator(task_id="end_task")
 
-    start_task >> [boxoffice_task] >> end_task
+    start_task >> [boxoffice_task, movieinfo_task] >> end_task
 
 
 data_pipeline()
