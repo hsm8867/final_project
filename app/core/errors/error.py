@@ -17,9 +17,11 @@ class MovieNotFoundException(BaseAPIException):
     def __init__(self):
         super().__init__(code=ERROR_400_MOVIE_NOT_FOUND, message="Movie not found")
 
+
 class MovieNotEnoughException(BaseAPIException):
-	def __init__(self):
-		super().__init__(code = ERROR_400_MOVIE_NOT_ENOUGH, message="Movie not enough")
+    def __init__(self):
+        super().__init__(code=ERROR_400_MOVIE_NOT_ENOUGH, message="Movie not enough")
+
 
 # class ClassCreationFailed(BaseAPIException):
 #     def __init__(self):

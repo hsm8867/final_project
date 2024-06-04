@@ -2,6 +2,8 @@ import pickle
 
 from redis.asyncio import Redis
 
+from typing import Optional
+
 from app.core.config import config
 
 
@@ -18,7 +20,7 @@ class RedisCache:
     async def close(self) -> None:
         await self.redis.close()
 
-    async def set(self, key: str, value: object, ttl: int = None) -> None:
+    async def set(self, key: str, value: object, ttl: Optional[int] = None) -> None:
         await self.redis.set(key, pickle.dumps(value), ex=ttl)
 
     async def get(self, key: str) -> object:

@@ -27,13 +27,13 @@ router = APIRouter()
 )
 async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
     try:
-        _key = key_builder("read_movie_by_date")
+        _key = key_builder(f"{date}")
 
         if await redis_cache.exists(_key):
-            logger.debug("Cache hit")
+            logger.debug(f"Cache hit: {_key}")
             result = await redis_cache.get(_key)
         else:
-            logger.debug("Cache miss")
+
             async with AsyncScopedSession() as session:
                 stmt = (
                     select(
@@ -55,6 +55,7 @@ async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
 
                 if result:
                     await redis_cache.set(_key, result, ttl=60)
+                    logger.debug(f"Cache miss: {_key}")
 
         if result is None:
             raise error.MovieNotFoundException()
@@ -75,4 +76,4 @@ async def showing_movies(date: datetime) -> BaseResponse[MovieResp]:
 
         return HttpResponse(content=movies)
     except Exception as e:
-        raise HTTPException(status_code=500)
+        raise HTTPException(status_code=500, detail=str(e))
