@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
 from app.core.db.session import AsyncScopedSession
-from app.utils import load_model, check_movie_count, prepare_data
+from app.core.model_registry import model_registry
 from app.models.schemas.model_ import ModelResp, ModelReq
 from app.models.db.movie_model import Movie, Movie_info
 from app.core.errors import error
@@ -37,13 +37,12 @@ async def predict(request: ModelReq):
             .limit(7)
         )
         result = (await session.execute(stmt)).all()
-        
+
         if not result:
             raise error.MovieNotFoundException()
-        
+
         if len(result) != 7:
             raise error.MovieNotEnoughException()
-            
 
         audiacc = max(row.audiacc for row in result)
         showacc = sum(row.showcnt for row in result)
@@ -58,10 +57,8 @@ async def predict(request: ModelReq):
                 "repgenrenm": [repgenrenm],
             }
         )
-        
-        # Load the model
-        model = load_model()
-        
-        result = model.predict(df)
-        
+
+        # Load and predict
+        result = model_registry.get_model("movie_model").predict(df)
+
         return ModelResp(result_=int(result))
