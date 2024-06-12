@@ -21,7 +21,7 @@ services:
       - -c
       - |
         mlflow server \
-        --backend-store-uri postgresql://postgres:mlecourse@34.64.47.40/mlflow_db \
+        --backend-store-uri postgresql://postgres:mlecourse@34.64.174.26/mlflow \
         --default-artifact-root s3://mlflow/ \
         --host 0.0.0.0
 
@@ -37,8 +37,11 @@ services:
     command: server /data/minio --console-address :9001
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - /home/ubuntu/model_registry:/data/minio
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 5
+
