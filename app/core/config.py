@@ -23,7 +23,7 @@ class Config(BaseSettings):
     MODEL_STAGE: str = "production"
     AWS_ACCESS_KEY_ID: str = "mlflow_admin"
     AWS_SECRET_ACCESS_KEY: str = "mlflow_admin"
-    MLFLOW_S3_ENDPOINT_URL: str = "http://10.178.0.2:9000"
+    MLFLOW_S3_ENDPOINT_URL: str = "http://10.178.0.3:9000"
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
 

@@ -1,10 +1,10 @@
 import pandas as pd
 from app.utils import load_model
-from app.models.schemas.model_ import ModelResp, ResponseModel
+from app.models.schemas.model_ import ModelResp
 from app.core.errors import error
-from app.repositories.model_repository import MovieRepository
 from app.core.db.session import AsyncScopedSession
-from app.models.schemas.common import BaseResponse, HttpResponse, ErrorResponse
+from app.core.model_registry import model_registry
+from app.repositories.model_repository import MovieRepository
 
 
 class PredictService:
@@ -33,7 +33,6 @@ class PredictService:
                 }
             )
 
-            model = load_model()
-            prediction = model.predict(df)
+            result = model_registry.get_model("movie_model").predict(df)
 
-            return ModelResp(result_=int(prediction))
+            return ModelResp(result_=int(result))
