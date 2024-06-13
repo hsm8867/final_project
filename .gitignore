@@ -1,5 +1,4 @@
-**/*.pt
+*.pt
 __pycache__
-app/core/config.py
 **/*.yaml
 **/*.ipynb
