@@ -1,0 +1,1 @@
+from app.repositories.movie_repository import MovieRepository
