@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from app.models.dtos.movie_model import MovieDTO
+from app.models.dtos.movie_ import MovieDTO
 
 
 class ModelResp(BaseModel):
