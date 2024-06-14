@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
 from app.models.dtos.movie_ import MovieDTO
 
 
@@ -8,10 +7,10 @@ class ModelResp(BaseModel):
 
 
 class ModelReq(BaseModel):
-    movienm: str = Field(..., example="리바운드", description="Movie name")
+    movienm: str = Field(..., description="Movie name")
 
     def to_dto(self) -> MovieDTO:
-        return MovieDTO(movienm=self.movienm)
+        return MovieDTO(moviename=self.movienm)
 
 
 class ResponseModel(BaseModel):

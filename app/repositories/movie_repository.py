@@ -15,8 +15,7 @@ from datetime import datetime
 
 class MovieRepository:
 
-    @RedisCacheDecorator
-    async def get_movie_list(moviename: str):
+    async def get_movie_list(self, moviename: str):
         async with AsyncScopedSession() as session:
             stmt = (
                 select(
@@ -49,12 +48,11 @@ class MovieRepository:
                 for row in result
             ]
 
-    @RedisCacheDecorator
+    @RedisCacheDecorator()
     async def showing_movie_list(
-        self, page: int, limit: int, date: datetime
+        self, date: datetime, page: int, limit: int
     ) -> MovieListDTO:
         async with AsyncScopedSession() as session:
-
             stmt = (
                 select(
                     Movie.date,
@@ -71,24 +69,24 @@ class MovieRepository:
                 .order_by(Movie.movienm)
             )
 
-            results = List[List[Movie, int]] = (await session.execute(stmt)).all()
+            results = (await session.execute(stmt)).all()
 
         data = []
         page = PageDTO(page=page, limit=limit, total=0)
 
         if results:
-            for row, total in results:
+            for r in results:
                 data.append(
                     MovieDTO(
-                        date=row.date,
-                        moviecd=row.moviecd,
-                        movienm=row.movienm,
-                        showcnt=row.showcnt,
-                        scrncnt=row.scrncnt,
-                        opendt=row.opendt,
-                        audiacc=row.audiacc,
-                        repregenrenm=row.repegenrenm,
+                        date=r.date,
+                        moviecd=r.moviecd,
+                        movienm=r.movienm,
+                        showcnt=r.showcnt,
+                        scrncnt=r.scrncnt,
+                        opendt=r.opendt,
+                        audiacc=r.audiacc,
+                        repgenrenm=r.repgenrenm,
                     )
                 )
-            page.total = total
+            page.total = len(results)
         return MovieListDTO(data=data, page=page)

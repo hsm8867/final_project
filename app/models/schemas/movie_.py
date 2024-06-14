@@ -34,6 +34,7 @@ class MovieResp:
         )
 
 
+@dataclass
 class MovieListResp:
     data: List[MovieResp] = Field(..., title="Data")
     page: PageResp = Field(..., title="Page")

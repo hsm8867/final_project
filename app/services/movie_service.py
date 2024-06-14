@@ -10,7 +10,10 @@ from app.models.dtos.movie_ import MovieListDTO
 from datetime import datetime
 
 from app.models.schemas.model_ import ModelResp
-from app.repositories.movie_repository import MovieRepository
+from app.models.schemas.common import BaseResponse
+from app import repositories
+
+from app.utils import prepare_for_predict
 
 router = APIRouter()
 
@@ -26,6 +29,8 @@ class MovieService:
             date, page=page, limit=limit
         )
 
-    async def predict(self, moviename: str) -> ModelResp:
-        input = self.movie_repository.get_movie_list(moviename)
-        return await model_registry.get_model("movie_model").predict(input)
+    async def predict(self, moviename: str) -> BaseResponse[ModelResp]:
+        data = await self.movie_repository.get_movie_list(moviename)
+        input = prepare_for_predict(data)
+        prediction = model_registry.get_model("movie_model").predict(input)
+        return ModelResp(result_=int(prediction))
