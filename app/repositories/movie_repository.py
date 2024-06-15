@@ -8,7 +8,6 @@ from app.models.dtos.movie_ import MovieDTO, MovieListDTO
 
 from app.core.redis import RedisCacheDecorator
 
-
 from typing import List
 from datetime import datetime
 
@@ -85,7 +84,7 @@ class MovieRepository:
                         scrncnt=r.scrncnt,
                         opendt=r.opendt,
                         audiacc=r.audiacc,
-                        repgenrenm=r.repgenrenm,
+                        repgenrenm=r.repgenrenm if r.repgenrenm is not None else "",
                     )
                 )
             page.total = len(results)

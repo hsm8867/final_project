@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from app.models.dtos.common import PageDTO
 
@@ -14,7 +14,7 @@ class MovieDTO:
     scrncnt: int
     opendt: str
     audiacc: int
-    repgenrenm: str
+    repgenrenm: Optional[str]
 
 
 @dataclass
