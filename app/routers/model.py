@@ -1,22 +1,14 @@
-import pandas as pd
-from fastapi import APIRouter, HTTPException
-
-from sqlalchemy import select
-
-from app.core.db.session import AsyncScopedSession
-from app.core.model_registry import model_registry
+from fastapi import APIRouter, Path
 from app.models.schemas.model_ import ModelResp, ModelReq
-from app.models.db.movie_model import Movie, Movie_info
-from app.services.model_service import PredictService
-
-from app.core.logger import logger
-
-import numpy as np
+from app.models.schemas.common import BaseResponse
+from app import repositories
+from app.services.movie_service import MovieService
 
 router = APIRouter()
 
 
 @router.post("/predict", response_model=ModelResp)
-async def predict(request: ModelReq):
-    result = await PredictService.predict(request.movienm)
+async def predict(moviename: str) -> BaseResponse[ModelResp]:
+    movie_service = MovieService(repositories.MovieRepository())
+    result = await movie_service.predict(moviename)
     return result

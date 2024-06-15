@@ -2,3 +2,4 @@
 __pycache__
 **/*.yaml
 **/*.ipynb
+app/core/config.py

@@ -1,10 +1,10 @@
 import pickle
-
 from redis.asyncio import Redis
-
 from typing import Optional
+from functools import wraps
 
 from app.core.config import config
+from app.core.logger import logger
 
 
 class RedisCache:
@@ -31,8 +31,35 @@ class RedisCache:
         return await self.redis.exists(key)
 
 
-def key_builder(*args) -> str:
-    return ":".join(map(str, args))
+class RedisCacheDecorator:
+    def __init__(self, ttl: int = 60):
+        self.ttl = ttl
+
+    def key_builder(self, f, kwargs) -> str:
+        return f"{f.__name__}.{str(kwargs)}"
+
+    def __call__(self, func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            _key = self.key_builder(func, kwargs=kwargs)
+
+            try:
+                if await redis_cache.exists(_key):
+                    logger.debug("Cache hit")
+                    result = await func(*args, **kwargs)
+                else:
+                    logger.debug("Cache miss")
+                    result = await func(*args, **kwargs)
+                    if result:
+                        logger.debug("Setting cache")
+                        await redis_cache.set(_key, result, ttl=self.ttl)
+            except Exception as e:
+                logger.error(f"Error in cache decorator: {e}")
+                result = await func(*args, **kwargs)
+
+            return result
+
+        return wrapper
 
 
 redis_cache = RedisCache()
