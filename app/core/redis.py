@@ -35,8 +35,10 @@ class RedisCacheDecorator:
     def __init__(self, ttl: int = 60):
         self.ttl = ttl
 
-    def key_builder(self, f, kwargs) -> str:
-        return f"{f.__name__}.{str(kwargs)}"
+    def key_builder(self, f, *args, kwargs) -> str:
+        args_str = ",".join([str(arg) for arg in args[1:]])
+        kwargs_str = ",".join([f"{k}={v}" for k, v in kwargs.items()])
+        return f"{f.__name__}:{args_str}:{str(kwargs)}"
 
     def __call__(self, func):
         @wraps(func)
@@ -46,6 +48,7 @@ class RedisCacheDecorator:
             try:
                 if await redis_cache.exists(_key):
                     logger.debug("Cache hit")
+                    print(_key)
                     result = await func(*args, **kwargs)
                 else:
                     logger.debug("Cache miss")
