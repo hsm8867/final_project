@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette_context.middleware import ContextMiddleware
 
@@ -9,6 +9,8 @@ from app.routers import router
 from app.core.errors.error import BaseAPIException
 from app.core.errors.handler import api_error_handler
 from app.core.middlewares.sqlalchemy import SQLAlchemyMiddleware
+from app.core.middlewares.metirc_middleware import MetricMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 
 app = FastAPI(lifespan=lifespan, **config.fastapi_kwargs)
@@ -24,8 +26,15 @@ app.add_middleware(
 )
 app.add_middleware(SQLAlchemyMiddleware)
 app.add_middleware(ContextMiddleware)
+app.add_middleware(MetricMiddleware)
 
 
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+@app.get("/metrics")
+async def get_metrics():
+    headers = {"Content-Type": CONTENT_TYPE_LATEST}
+    content = generate_latest().decode("utf-8")
+    return Response(content=content, media_type="text/plain", headers=headers)
