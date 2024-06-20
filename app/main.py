@@ -13,7 +13,7 @@ from app.core.errors.handler import api_error_handler
 from app.core.middlewares.sqlalchemy import SQLAlchemyMiddleware
 
 
-def create_app() -> FastAPI:
+def create_app(container=Container()) -> FastAPI:
     app = FastAPI(lifespan=lifespan, **config.fastapi_kwargs)
 
     container = Container()
