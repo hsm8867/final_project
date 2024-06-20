@@ -1,6 +1,6 @@
 import pytest
 
-from unitest.mock import AsyncMock
+from unittest.mock import AsyncMock
 
 from httpx import AsyncClient
 
