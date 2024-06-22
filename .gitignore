@@ -1,6 +1,9 @@
 *.pt
 __pycache__
 **/*.yaml
+!cd.yaml
+!ci_workflow.yaml
+!cd_workflow.yaml
 **/*.ipynb
 app/core/config.py
 .pytest_cache
