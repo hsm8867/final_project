@@ -3,7 +3,7 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from pendulum import datetime
 
-from module import get_data
+from dags.module import data_modules
 
 
 @dag(
@@ -18,12 +18,12 @@ def data_receiving_pipeline():
 
     boxoffice_task = PythonOperator(
         task_id="box_office",
-        python_callable=get_data.get,
+        python_callable=data_modules.update_daily,
     )
 
     movieinfo_task = PythonOperator(
         task_id="movie_info",
-        python_callable=get_data.update_movie_info,
+        python_callable=data_modules.update_movie_info,
     )
 
     end_task = EmptyOperator(task_id="end_task")

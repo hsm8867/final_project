@@ -30,7 +30,7 @@ def get_daily_box_office(today_date, key):
     return daily_data
 
 
-def get(**context):
+def update_daily(**context):
     # 업데이트 할 데이터의 날짜(어제)
     tz_kst = pytz.timezone("Asia/Seoul")
     yesterday_kst = datetime.now(tz_kst) - timedelta(days=1)
@@ -132,3 +132,19 @@ def update_movie_info(**context):
         )
     else:
         print("데이터가 없습니다.")
+
+
+def load_from_database(**context):
+    hook = PostgresHook(postgres_conn_id="postgres_default")
+    conn = hook.get_conn()
+    stmt = """
+            SELECT m.*, mi.repgenrenm
+            FROM data.movies m
+            LEFT JOIN data.movie_info mi
+            ON m.moviecd = mi.moviecd;
+
+            """
+
+    data = pd.read_sql(stmt, conn)
+
+    return data

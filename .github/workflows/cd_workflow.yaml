@@ -32,7 +32,7 @@ jobs:
       - name: Build and Push Container
         run: |-
           gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev
-          docker build -t "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ github.sha }}" ./
+          docker build -f Dockerfile-cd -t "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ github.sha }}" ./
           docker push "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ github.sha }}"
 
       # END - Docker auth and build
