@@ -3,7 +3,6 @@ from app.models.db.movie_ import Movie, Movie_info
 
 from app.core.db.session import AsyncScopedSession
 
-from app.models.dtos.common import PageDTO
 from app.models.dtos.movie_ import MovieDTO, MovieListDTO
 
 from app.core.redis import RedisCacheDecorator
@@ -48,9 +47,7 @@ class MovieRepository:
             ]
 
     @RedisCacheDecorator()
-    async def showing_movie_list(
-        self, date: datetime, page: int, limit: int
-    ) -> MovieListDTO:
+    async def showing_movie_list(self, date: datetime) -> MovieListDTO:
         async with AsyncScopedSession() as session:
             stmt = (
                 select(
@@ -71,7 +68,6 @@ class MovieRepository:
             results = (await session.execute(stmt)).all()
 
         data = []
-        page = PageDTO(page=page, limit=limit, total=0)
 
         if results:
             for r in results:
@@ -87,5 +83,4 @@ class MovieRepository:
                         repgenrenm=r.repgenrenm if r.repgenrenm is not None else "",
                     )
                 )
-            page.total = len(results)
-        return MovieListDTO(data=data, page=page)
+        return MovieListDTO(data=data)

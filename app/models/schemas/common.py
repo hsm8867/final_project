@@ -29,14 +29,3 @@ class HttpResponse(ORJSONResponse):
             },
             **kwargs
         )
-
-
-@dataclass
-class PageResp:
-    page: int
-    limit: int
-    total: int
-
-    @classmethod
-    def from_dto(cls, dto: PageDTO) -> "PageResp":
-        return cls(page=dto.page, limit=dto.limit, total=dto.total)
