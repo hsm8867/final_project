@@ -4,9 +4,10 @@ import time
 import pandas as pd
 import pytz
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.models.variable import Variable
 
 # API 키 설정
-api_key = "12d75fdeab5071a1fff3090078f5701e"
+key = Variable.get("key")
 
 
 def get_daily_box_office(today_date, key):
@@ -30,7 +31,6 @@ def get_daily_box_office(today_date, key):
 
 
 def get(**context):
-    key = "5e38bdb1f56234fc61867650667fa591"
     # 업데이트 할 데이터의 날짜(어제)
     tz_kst = pytz.timezone("Asia/Seoul")
     yesterday_kst = datetime.now(tz_kst) - timedelta(days=1)
@@ -118,7 +118,6 @@ def process_movie_info(movies):
 
 
 def update_movie_info(**context):
-    key = "12d75fdeab5071a1fff3090078f5701e"
     targetYear = 2024
 
     movies = fetch_movie_data(targetYear, key)
