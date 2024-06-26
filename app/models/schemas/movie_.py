@@ -2,7 +2,6 @@ from pydantic import Field
 from pydantic.dataclasses import dataclass
 from typing import List
 from datetime import datetime
-from app.models.schemas.common import PageResp
 from app.models.dtos.movie_ import (
     MovieDTO,
     MovieListDTO,
@@ -37,11 +36,7 @@ class MovieResp:
 @dataclass
 class MovieListResp:
     data: List[MovieResp] = Field(..., title="Data")
-    page: PageResp = Field(..., title="Page")
 
     @classmethod
     def from_dto(cls, dto: MovieListDTO) -> "MovieListResp":
-        return cls(
-            data=[MovieResp.from_dto(movie_) for movie_ in dto.data],
-            page=PageResp.from_dto(dto.page),
-        )
+        return cls(data=[MovieResp.from_dto(movie_) for movie_ in dto.data])
