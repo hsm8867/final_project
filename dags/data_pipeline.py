@@ -13,7 +13,7 @@ from module import get_data
     default_args={"owner": "Astro", "retries": 3},
     tags=["example"],
 )
-def data_pipeline():
+def data_receiving_pipeline():
     start_task = EmptyOperator(task_id="start_task")
 
     boxoffice_task = PythonOperator(
@@ -31,4 +31,4 @@ def data_pipeline():
     start_task >> [boxoffice_task, movieinfo_task] >> end_task
 
 
-data_pipeline()
+data_receiving_pipeline()

@@ -2,8 +2,6 @@ from fastapi import APIRouter
 
 from app import repositories
 
-from app.core.db.session import AsyncScopedSession
-from app.core.errors import error
 from app.core.model_registry import model_registry
 from app.models.dtos.movie_ import MovieListDTO
 

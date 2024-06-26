@@ -17,7 +17,7 @@ from module.transit_model import transition_model_stage
     default_args={"owner": "Astro", "retries": 3},
     tags=["example"],
 )
-def movie_pipeline():
+def moviemodel_train_pipeline():
     start_task = EmptyOperator(task_id="start_task")
 
     # ExternalTaskSensor to wait for data_pipeline DAG to complete
@@ -58,4 +58,4 @@ def movie_pipeline():
     )
 
 
-movie_pipeline()
+moviemodel_train_pipeline()

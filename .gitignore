@@ -4,4 +4,3 @@ __pycache__
 **/*.ipynb
 app/core/config.py
 .pytest_cache
-prometheus-grafana/grafana/volume/grafana.db\
