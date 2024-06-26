@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.models.schemas.model_ import ModelResp
-from app.models.schemas.common import HttpResponse, BaseResponse
+from app.models.schemas.common import BaseResponse
 
 from dependency_injector.wiring import Provide, inject
 
@@ -10,7 +10,7 @@ from app.services.movie_service import MovieService
 router = APIRouter()
 
 
-@router.post("/predict", response_model=ModelResp)
+@router.post("/predict", response_model=BaseResponse[ModelResp])
 @inject
 async def predict(
     moviename: str,
@@ -18,4 +18,4 @@ async def predict(
 ) -> BaseResponse[ModelResp]:
 
     result = await movie_service.predict(moviename)
-    return result
+    return BaseResponse(data=result)
