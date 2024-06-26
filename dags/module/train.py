@@ -12,13 +12,13 @@ from optuna.storages import RDBStorage
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 import mlflow
-from module.load_data import load_from_database
+from module.load_data import load
 from module.preprocess_data import preprocess
 
 
 def train_fn(experiment_name: str, **context):
     mlflow.set_experiment(experiment_name)
-    data = load_from_database()
+    data = load()
     data = preprocess(data)
 
     y = data["total"]
@@ -76,6 +76,7 @@ def train_fn(experiment_name: str, **context):
         return rmse
 
     hook = PostgresHook(postgres_conn_id="postgres_default")
+    conn = hook.get_conn()
     storage = RDBStorage(url=hook.get_uri().replace("/raw", "/optuna"))
 
     # Optuna study

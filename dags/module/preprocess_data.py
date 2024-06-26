@@ -35,8 +35,10 @@ def preprocess(df):
     df.dropna(inplace=True)
 
     # 총 관객 수 관련(target 변수)
+    tz_kst = pytz.timezone("Asia/Seoul")
+    today_kst = datetime.now(tz_kst)
 
-    yesterday_kst = datetime.now(pytz.timezone("Asia/Seoul")) - timedelta(days=1)
+    yesterday_kst = today_kst - timedelta(days=1)
     yesterday_str = yesterday_kst.strftime("%Y-%m-%d")
 
     # 마지막 관측값만 추출(total 변수)
