@@ -5,3 +5,4 @@ __pycache__
 **/*.ipynb
 app/core/config.py
 .pytest_cache
+*.json

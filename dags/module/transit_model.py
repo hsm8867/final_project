@@ -1,5 +1,6 @@
 from mlflow.tracking import MlflowClient
 
+
 def transition_model_stage(model_name: str, **context):
     version = context["ti"].xcom_pull(key="model_version")
     eval_metric = context["ti"].xcom_pull(key="eval_metric")
@@ -26,7 +27,7 @@ def transition_model_stage(model_name: str, **context):
             eval_metric
         ]
 
-        if current_metric > production_metric:
+        if current_metric < production_metric:
             client.transition_model_version_stage(
                 current_model.name,
                 current_model.version,
