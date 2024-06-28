@@ -3,6 +3,5 @@ __pycache__
 **/*.yaml
 !.github/workflows/*
 **/*.ipynb
-app/core/config.py
 .pytest_cache
 *.json
