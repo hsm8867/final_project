@@ -20,4 +20,3 @@ class MovieDTO:
 @dataclass
 class MovieListDTO:
     data: List[MovieDTO]
-    page: PageDTO

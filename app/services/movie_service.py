@@ -20,12 +20,8 @@ class MovieService:
     def __init__(self, movie_repository: repositories.MovieRepository):
         self.movie_repository = movie_repository
 
-    async def read_showing_movies(
-        self, date: datetime, page: int, limit: int
-    ) -> MovieListDTO:
-        return await self.movie_repository.showing_movie_list(
-            date, page=page, limit=limit
-        )
+    async def read_showing_movies(self, date: datetime) -> MovieListDTO:
+        return await self.movie_repository.showing_movie_list(date)
 
     async def predict(self, moviename: str) -> BaseResponse[ModelResp]:
         data = await self.movie_repository.get_movie_list(moviename)

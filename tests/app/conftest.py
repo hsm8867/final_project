@@ -28,4 +28,4 @@ def movie_repository_mock():
 
 @pytest.fixture
 def movie_service_mock(movie_repository_mock):
-    return AsyncMock(movie_repository=movie_repository_mock)
+    return MovieService(movie_repository_mock)

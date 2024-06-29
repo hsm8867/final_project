@@ -1,45 +1,40 @@
+from unittest.mock import AsyncMock
 import pytest
 from datetime import datetime
 
 from httpx import AsyncClient
 
 from app.core.container import Container
-from app.models.dtos.movie_ import MovieDTO
-from app.models.schemas.model_ import ModelReq
+from app.models.dtos.movie_ import MovieListDTO
+from app.models.schemas.model_ import ModelResp
 
 from app.services import MovieService
 
-from datetime import datetime
 
-
-@pytest.mark.parametrize("movienm", [("movienm")])
+@pytest.mark.parametrize("moviename", [("TestMovie")])
 async def test_predict_200(
     container: Container,
     async_client: AsyncClient,
     movie_service_mock: MovieService,
-    movienm: str,
+    movie_repository_mock: AsyncMock,
+    moviename: str,
 ):
 
-    data = ModelReq(movienm=movienm)
+    movie_repository_mock.get_movie_list.return_value = [{"moviename": moviename}]
+    movie_repository_mock.showing_movie_list.return_value = MovieListDTO(data=[])
 
-    movie_dto = MovieDTO(
-        movienm="-",
-        date=datetime.now(),
-        moviecd=1,
-        showcnt=1,
-        scrncnt=1,
-        opendt=datetime.now(),
-        audiacc=1,
-        repgenrenm="genre",
-    )
+    movie_service_mock.movie_repository = movie_repository_mock
 
-    movie_service_mock.movie_repository.predcit.return_value = movie_dto
-    container.movie_service.override(movie_service_mock)
+    prediction_input = {"moviename": moviename}
 
-    url = "v1/predict"
-    response = await async_client.post(url, data=data.model_dump_json())
-    json_response = response.json()
+    movie_service_mock.predict = AsyncMock(return_value=ModelResp(result_=1))
+
+    url = "/v1/model/predict"
+    response = await async_client.post(url, json={"moviename": moviename})
 
     assert response.status_code == 200
-    assert json_response["data"]["movienm"] == movie_dto.movienm
-    # assert json_response["data"]["repgenrenm"] == movie_dto.repgenrenm
+    json_response = response.json()
+    assert json_response["data"]["result"] == 1
+
+    movie_repository_mock.get_movie_list.assert_called_once_with(moviename)
+    movie_service_mock.predict.assert_called_once_with(moviename)
