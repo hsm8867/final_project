@@ -1,1 +1,8 @@
 *.pt
+__pycache__
+**/*.yaml
+!.github/workflows/*
+**/*.ipynb
+.pytest_cache
+*.json
+env.txt
