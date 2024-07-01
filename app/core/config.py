@@ -21,7 +21,7 @@ class Config(BaseSettings):
     )
     MODEL_NAME: str = "movie_model"
     MODEL_STAGE: str = "production"
-    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY")
+    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY")
     MLFLOW_S3_ENDPOINT_URL: str = os.getenv("MLFLOW_S3_ENDPOINT_URL")
     MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI")
