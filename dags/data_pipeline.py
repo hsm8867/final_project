@@ -1,34 +1,64 @@
-from airflow.decorators import dag, task
+from datetime import datetime, timedelta
+from airflow.decorators import dag
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
-from pendulum import datetime
-
-from module import get_data
+from airflow.utils.trigger_rule import TriggerRule
+from dags.module.delay import delay_start_10
+from dags.module.create_table import create_table_fn
+from dags.module.save_raw_data import (
+    save_raw_data_from_API_fn,
+)
+from dags.module.preprocess import preprocess_data_fn
+from airflow.models import Variable
 
 
 @dag(
-    start_date=datetime(2024, 1, 1),
-    schedule="@daily",
+    dag_id="data_pipeline",
+    schedule_interval="*/5 * * * *",  # 5분마다 실행
+    start_date=datetime(2024, 6, 27, 0, 0),
     catchup=False,
-    default_args={"owner": "Astro", "retries": 3},
-    tags=["example"],
+    default_args={
+        "owner": "admin",
+        "retries": 3,
+        "retry_delay": timedelta(minutes=3),
+        "execution_timeout": timedelta(minutes=10),
+    },
+    tags=["UPBIT_BTC_KRW"],
 )
 def data_pipeline():
     start_task = EmptyOperator(task_id="start_task")
 
-    boxoffice_task = PythonOperator(
-        task_id="box_office",
-        python_callable=get_data.get,
+    delay_task = PythonOperator(
+        task_id="delay_10seconds",
+        python_callable=delay_start_10,
     )
 
-    movieinfo_task = PythonOperator(
-        task_id="movie_info",
-        python_callable=get_data.update_movie_info,
+    create_table_task = PythonOperator(
+        task_id="create_table",
+        python_callable=create_table_fn,
     )
 
-    end_task = EmptyOperator(task_id="end_task")
+    save_data_task = PythonOperator(
+        task_id="save_raw_data_from_UPBIT_API",
+        python_callable=save_raw_data_from_API_fn,
+        trigger_rule=TriggerRule.ALL_DONE,
+    )
 
-    start_task >> [boxoffice_task, movieinfo_task] >> end_task
+    preprocess_task = PythonOperator(
+        task_id="preprocess_data",
+        python_callable=preprocess_data_fn,
+        trigger_rule=TriggerRule.ALL_DONE,
+    )
 
+    end_task = EmptyOperator(task_id="end_task", trigger_rule=TriggerRule.ALL_DONE)
 
+    (
+        start_task
+        >> delay_task
+        >> create_table_task
+        >> save_data_task
+        >> preprocess_task
+        >> end_task
+    )
+    
 data_pipeline()
