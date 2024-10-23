@@ -6,16 +6,22 @@ from airflow.utils.trigger_rule import TriggerRule
 from dags.module.delay import delay_start_10
 from dags.module.create_table import create_table_fn
 from dags.module.save_raw_data import (
-    save_raw_data_from_API_fn,
+    collect_and_load_data,
 )
 from dags.module.preprocess import preprocess_data_fn
 from airflow.models import Variable
+import asyncio
 
+def sync_collect_and_load_data():
+    asyncio.run(collect_and_load_data())
+
+def sync_preprocess_data_fn(**context):
+    asyncio.run(preprocess_data_fn(**context))
 
 @dag(
     dag_id="data_pipeline",
     schedule_interval="*/5 * * * *",  # 5분마다 실행
-    start_date=datetime(2024, 6, 27, 0, 0),
+    start_date=datetime(2024, 10, 23, 0, 0),
     catchup=False,
     default_args={
         "owner": "admin",
@@ -40,7 +46,7 @@ def data_pipeline():
 
     save_data_task = PythonOperator(
         task_id="save_raw_data_from_UPBIT_API",
-        python_callable=save_raw_data_from_API_fn,
+        python_callable=sync_collect_and_load_data,
         trigger_rule=TriggerRule.ALL_DONE,
     )
 

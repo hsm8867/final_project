@@ -15,6 +15,8 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
+from airflow.models.variable import Variable
+
 import psutil
 import pandas as pd
 import numpy as np
@@ -1143,13 +1145,8 @@ async def preprocess_data(context: dict) -> None:
     past_new_time : save_raw_data_from_UPBIT_API 태스크에서 적재 되기 전에 db에 존재하는 데이터 중 가장 최근시간 (없으면 None)
     current_time : save_raw_data_from_UPBIT_API 태스크에서 업비트에 데이터를 호출했을 당시의 시간
     """
-    db_uri = context["db_uri"]
-    engine = create_async_engine(
-        db_uri.replace("postgresql", "postgresql+asyncpg"),
-        pool_size=10,
-        max_overflow=20,
-        future=True,
-    )
+    db_uri = Variable.get("db_uri")
+    engine = create_async_engine(db_uri, future=True)
     session_factory = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
     # 비동기 함수들간에 세션을 안전하게 공유, 세션 자동생성/해제 하기 위해 사용. 세션 관리하기 좋고 코드의일관성 유지가능.
     AsyncScopedSession = async_scoped_session(
@@ -1172,9 +1169,13 @@ async def preprocess_data(context: dict) -> None:
     # 테스트용 new_time 설계
     # new_time = (datetime.fromisoformat(past_new_time) + timedelta(hours=10)).isoformat()
 
-    current_time_dt = (
-        datetime.fromisoformat(current_time).replace(second=0, microsecond=0)
-    ).isoformat()
+    if current_time is None:
+        current_time_dt = datetime.now().replace(second=0, microsecond=0).isoformat()
+    else:
+        current_time_dt = datetime.fromisoformat(current_time).replace(second=0, microsecond=0).isoformat()
+
+    if past_new_time is None:
+        past_new_time = (datetime.now() - relativedelta(days=365)).isoformat()  # Default to 1 year ago
 
     # 데이터가 추가되지 않았을시에는 이 작업을 하지 않음
     if new_time is None:
