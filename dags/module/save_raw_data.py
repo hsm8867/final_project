@@ -243,7 +243,7 @@ async def delete_old_data(session: AsyncSession) -> None:
 # Main function to fetch and insert data
 async def collect_and_load_data_fn():
     # Database connection details
-    db_uri = Variable.get("db_uri")
+    db_uri = Variable.get("db_uri").replace("postgresql://", "postgresql+asyncpg://")
     engine = create_async_engine(db_uri, future=True)
     SessionLocal = sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False
