@@ -21,6 +21,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, func
 from datetime import timedelta
 
+from asyncpg.exceptions import DeadlockDetectedError
+
 import psutil
 import pandas as pd
 import numpy as np
@@ -40,6 +42,29 @@ Base = declarative_base()
 
 # ContextVar를 사용하여 세션을 관리(비동기 함수간에 컨텍스트를 안전하게 전달하도록 해줌. 세션을 여러 코루틴간에 공유 가능)
 session_context = ContextVar("session_context", default=None)
+
+
+# deadlock 발생 시 retry 실행 함수
+async def execute_with_retry(session, query, max_retries=3, delay=2):
+    retries = 0
+    while retries < max_retries:
+        try:
+            await session.execute(query)
+            await session.commit()
+            logger.info("Query executed successfully")
+            return
+        except DeadlockDetectedError as e:
+            logger.warning(
+                f"Deadlock detected: {e}, retrying {retries + 1}/{max_retries}"
+            )
+            await asyncio.sleep(delay)
+            retries += 1
+            await session.rollback()  # Roll back the transaction before retrying
+
+    # If max_retries is reached and it still fails, raise the error
+    raise DeadlockDetectedError(
+        f"Query failed after {max_retries} retries due to deadlock."
+    )
 
 
 # 현재 시간(UTC+9)으로부터 365일이 지난 데이터를 데이터베이스에서 삭제하는 함수
@@ -119,318 +144,154 @@ async def get_first_and_last_time(
     return first_time, last_time
 
 
-# Add Moving Averages (MA)
 async def add_moving_average(
     session: AsyncSession, first_time: str, last_time: str
 ) -> None:
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
-            SELECT
-                time,
-                (close - LAG(close) OVER (ORDER BY time)) / LAG(close) OVER (ORDER BY time) * 100 as close_change,
-                (open - LAG(open) OVER (ORDER BY time)) / LAG(open) OVER (ORDER BY time) * 100 as open_change,
-                (high - LAG(high) OVER (ORDER BY time)) / LAG(high) OVER (ORDER BY time) * 100 as high_change,
-                (low - LAG(low) OVER (ORDER BY time)) / LAG(low) OVER (ORDER BY time) * 100 as low_change,
-                (volume - LAG(volume) OVER (ORDER BY time)) / LAG(volume) OVER (ORDER BY time) * 100 as volume_change
-            FROM btc_ohlcv
-            WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            ON CONFLICT (time) DO NOTHING;
-            """
-        )
-    )
-
-    # Update the moving averages
-    await session.execute(
-        text(
-            f"""
-            WITH subquery AS (
-                SELECT
-                    time,
-                    AVG(close) OVER (ORDER BY time ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_close_7,
-                    AVG(close) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS avg_close_14,
-                    AVG(close) OVER (ORDER BY time ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) AS avg_close_30
-                FROM btc_ohlcv
-                WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            )
-            UPDATE btc_preprocessed
-            SET ma_7 = subquery.avg_close_7,
-                ma_14 = subquery.avg_close_14,
-                ma_30 = subquery.avg_close_30
-            FROM subquery
-            WHERE btc_preprocessed.time = subquery.time
-            AND btc_preprocessed.time BETWEEN '{first_time}' AND '{last_time}';
-            """
-        )
-    )
-
-    await session.commit()
-    logger.info("MA add success")
-
-    # Add Exponential Moving Averages (EMA)
-
     logger.info(
-        f"Add EMA_7, EMA_14, EMA_30 in btc_preprocessed between {first_time} and {last_time}"
+        f"Adding or updating moving averages between {first_time} and {last_time}"
     )
 
-    # Insert the processed data from btc_ohlcv into btc_preprocessed
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
+    query = text(
+        f"""
+        WITH subquery AS (
             SELECT
                 time,
-                (close - LAG(close) OVER (ORDER BY time)) / LAG(close) OVER (ORDER BY time) * 100 as close_change,
-                (open - LAG(open) OVER (ORDER BY time)) / LAG(open) OVER (ORDER BY time) * 100 as open_change,
-                (high - LAG(high) OVER (ORDER BY time)) / LAG(high) OVER (ORDER BY time) * 100 as high_change,
-                (low - LAG(low) OVER (ORDER BY time)) / LAG(low) OVER (ORDER BY time) * 100 as low_change,
-                (volume - LAG(volume) OVER (ORDER BY time)) / LAG(volume) OVER (ORDER BY time) * 100 as volume_change
+                AVG(close) OVER (ORDER BY time ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_close_7,
+                AVG(close) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS avg_close_14,
+                AVG(close) OVER (ORDER BY time ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) AS avg_close_30
             FROM btc_ohlcv
             WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            ON CONFLICT (time) DO NOTHING;
-            """
         )
+        INSERT INTO btc_preprocessed (time, ma_7, ma_14, ma_30)
+        SELECT subquery.time, subquery.avg_close_7, subquery.avg_close_14, subquery.avg_close_30
+        FROM subquery
+        ON CONFLICT (time) DO UPDATE
+        SET ma_7 = EXCLUDED.ma_7,
+            ma_14 = EXCLUDED.ma_14,
+            ma_30 = EXCLUDED.ma_30;
+    """
     )
 
-    # Update the EMA values
-    await session.execute(
-        text(
-            f"""
-            WITH subquery AS (
-                SELECT
-                    time,
-                    EXP(SUM(LOG(close)) OVER (ORDER BY time ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)) AS ema_close_7,
-                    EXP(SUM(LOG(close)) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW)) AS ema_close_14,
-                    EXP(SUM(LOG(close)) OVER (ORDER BY time ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)) AS ema_close_30
-                FROM btc_ohlcv
-                WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            )
-            UPDATE btc_preprocessed
-            SET ema_7 = subquery.ema_close_7,
-                ema_14 = subquery.ema_close_14,
-                ema_30 = subquery.ema_close_30
-            FROM subquery
-            WHERE btc_preprocessed.time = subquery.time
-            AND btc_preprocessed.time BETWEEN '{first_time}' AND '{last_time}';
-            """
-        )
-    )
-
-    await session.commit()
-    logger.info("EMA add success")
+    await execute_with_retry(session, query)
+    logger.info("Moving averages added/updated successfully")
 
 
-# Add RSI (14-day Relative Strength Index)
 async def add_rsi(session: AsyncSession, first_time: str, last_time: str) -> None:
-    logger.info(f"Add RSI_14 in btc_preprocessed between {first_time} and {last_time}")
+    logger.info(f"Adding or updating RSI between {first_time} and {last_time}")
 
-    # Insert the processed data from btc_ohlcv into btc_preprocessed
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
+    query = text(
+        f"""
+        WITH gains_and_losses AS (
             SELECT
                 time,
-                (close - LAG(close) OVER (ORDER BY time)) / LAG(close) OVER (ORDER BY time) * 100 as close_change,
-                (open - LAG(open) OVER (ORDER BY time)) / LAG(open) OVER (ORDER BY time) * 100 as open_change,
-                (high - LAG(high) OVER (ORDER BY time)) / LAG(high) OVER (ORDER BY time) * 100 as high_change,
-                (low - LAG(low) OVER (ORDER BY time)) / LAG(low) OVER (ORDER BY time) * 100 as low_change,
-                (volume - LAG(volume) OVER (ORDER BY time)) / LAG(volume) OVER (ORDER BY time) * 100 as volume_change
+                CASE WHEN close - LAG(close) OVER (ORDER BY time) > 0
+                    THEN close - LAG(close) OVER (ORDER BY time)
+                    ELSE 0
+                END AS gain,
+                CASE WHEN close - LAG(close) OVER (ORDER BY time) < 0
+                    THEN LAG(close) OVER (ORDER BY time) - close
+                    ELSE 0
+                END AS loss
             FROM btc_ohlcv
             WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            ON CONFLICT (time) DO NOTHING;
-            """
+        ),
+        avg_gains_losses AS (
+            SELECT
+                time,
+                AVG(gain) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS avg_gain,
+                AVG(loss) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS avg_loss
+            FROM gains_and_losses
         )
+        INSERT INTO btc_preprocessed (time, rsi_14)
+        SELECT avg_gains_losses.time,
+            CASE
+                WHEN avg_loss = 0 THEN 100
+                WHEN avg_gain = 0 THEN 0
+                ELSE 100 - (100 / (1 + avg_gain / avg_loss))
+            END AS rsi_14
+        FROM avg_gains_losses
+        ON CONFLICT (time) DO UPDATE
+        SET rsi_14 = EXCLUDED.rsi_14;
+    """
     )
 
-    # Update the RSI values
-    await session.execute(
-        text(
-            f"""
-            WITH gains_and_losses AS (
-                SELECT
-                    time,
-                    CASE WHEN close - LAG(close) OVER (ORDER BY time) > 0
-                        THEN close - LAG(close) OVER (ORDER BY time)
-                        ELSE 0
-                    END AS gain,
-                    CASE WHEN close - LAG(close) OVER (ORDER BY time) < 0
-                        THEN LAG(close) OVER (ORDER BY time) - close
-                        ELSE 0
-                    END AS loss
-                FROM btc_ohlcv
-                WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            ),
-            avg_gains_losses AS (
-                SELECT
-                    time,
-                    AVG(gain) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS avg_gain,
-                    AVG(loss) OVER (ORDER BY time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS avg_loss
-                FROM gains_and_losses
-            )
-            UPDATE btc_preprocessed
-            SET rsi_14 = CASE
-                            WHEN avg_loss = 0 THEN 100
-                            WHEN avg_gain = 0 THEN 0
-                            ELSE 100 - (100 / (1 + avg_gain / avg_loss))
-                        END
-            FROM avg_gains_losses
-            WHERE btc_preprocessed.time = avg_gains_losses.time
-            AND btc_preprocessed.time BETWEEN '{first_time}' AND '{last_time}';
-            """
-        )
-    )
-
-    await session.commit()
-    logger.info("RSI add success")
+    await execute_with_retry(session, query)
+    logger.info("RSI added/updated successfully")
 
 
-# Add RSI Over feature (RSI > 75 or RSI < 25)
 async def add_rsi_over(session: AsyncSession, first_time: str, last_time: str) -> None:
-    logger.info(
-        f"Add RSI_OVER in btc_preprocessed between {first_time} and {last_time}"
+    logger.info(f"Adding or updating RSI_OVER between {first_time} and {last_time}")
+
+    query = text(
+        f"""
+        UPDATE btc_preprocessed
+        SET rsi_over = CASE
+                          WHEN rsi_14 > 75 THEN 1
+                          WHEN rsi_14 < 25 THEN 0
+                          ELSE 2
+                      END
+        WHERE time BETWEEN '{first_time}' AND '{last_time}';
+    """
     )
 
-    # Insert the processed data from btc_ohlcv into btc_preprocessed
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
-            SELECT
-                time,
-                (close - LAG(close) OVER (ORDER BY time)) / LAG(close) OVER (ORDER BY time) * 100 as close_change,
-                (open - LAG(open) OVER (ORDER BY time)) / LAG(open) OVER (ORDER BY time) * 100 as open_change,
-                (high - LAG(high) OVER (ORDER BY time)) / LAG(high) OVER (ORDER BY time) * 100 as high_change,
-                (low - LAG(low) OVER (ORDER BY time)) / LAG(low) OVER (ORDER BY time) * 100 as low_change,
-                (volume - LAG(volume) OVER (ORDER BY time)) / LAG(volume) OVER (ORDER BY time) * 100 as volume_change
-            FROM btc_ohlcv
-            WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            ON CONFLICT (time) DO NOTHING;
-            """
-        )
-    )
-
-    # First update 25 <= rsi <= 75 to 2
-    await session.execute(
-        text(
-            f"""
-            UPDATE btc_preprocessed
-            SET rsi_over = 2
-            WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            AND rsi_14 > 25 AND rsi_14 < 75;
-            """
-        )
-    )
-
-    # Process RSI > 75
-    await session.execute(
-        text(
-            f"""
-            UPDATE btc_preprocessed
-            SET rsi_over = 1
-            WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            AND rsi_14 >= 75;
-            """
-        )
-    )
-
-    # Process RSI < 25
-    await session.execute(
-        text(
-            f"""
-            UPDATE btc_preprocessed
-            SET rsi_over = 0
-            WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            AND rsi_14 <= 25;
-            """
-        )
-    )
-
-    await session.commit()
-    logger.info("RSI_OVER add success")
+    await execute_with_retry(session, query)
+    logger.info("RSI_OVER added/updated successfully")
 
 
-# Update labels (price up: 1, price down: 0)
 async def update_labels(session: AsyncSession, first_time: str, last_time: str) -> None:
-    logger.info("Updating labels 1 or 0 for all entries in btc_preprocessed")
+    logger.info(f"Updating labels between {first_time} and {last_time}")
 
-    # Insert the processed data from btc_ohlcv into btc_preprocessed
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
-            SELECT
-                time,
-                (close - LAG(close) OVER (ORDER BY time)) / LAG(close) OVER (ORDER BY time) * 100 as close_change,
-                (open - LAG(open) OVER (ORDER BY time)) / LAG(open) OVER (ORDER BY time) * 100 as open_change,
-                (high - LAG(high) OVER (ORDER BY time)) / LAG(high) OVER (ORDER BY time) * 100 as high_change,
-                (low - LAG(low) OVER (ORDER BY time)) / LAG(low) OVER (ORDER BY time) * 100 as low_change,
-                (volume - LAG(volume) OVER (ORDER BY time)) / LAG(volume) OVER (ORDER BY time) * 100 as volume_change
-            FROM btc_ohlcv
+    query = text(
+        f"""
+        WITH CTE AS (
+            SELECT time, close,
+                   LAG(close) OVER (ORDER BY time) AS prev_close
+            FROM btc_preprocessed
             WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            ON CONFLICT (time) DO NOTHING;
-            """
         )
+        UPDATE btc_preprocessed
+        SET label = CASE
+                       WHEN CTE.close > CTE.prev_close THEN 1
+                       ELSE 0
+                   END
+        FROM CTE
+        WHERE btc_preprocessed.time = CTE.time
+        AND btc_preprocessed.time BETWEEN '{first_time}' AND '{last_time}';
+    """
     )
 
-    # Update the labels (price up: 1, price down: 0)
-    await session.execute(
-        text(
-            f"""
-            WITH CTE AS (
-                SELECT time, close,
-                       LAG(close) OVER (ORDER BY time) AS prev_close
-                FROM btc_preprocessed
-                WHERE time BETWEEN '{first_time}' AND '{last_time}'
-            )
-            UPDATE btc_preprocessed
-            SET label = CASE
-                            WHEN CTE.close > CTE.prev_close THEN 1
-                            ELSE 0
-                        END
-            FROM CTE
-            WHERE btc_preprocessed.time = CTE.time
-            AND btc_preprocessed.time BETWEEN '{first_time}' AND '{last_time}';
-            """
-        )
-    )
-
-    await session.commit()
+    await execute_with_retry(session, query)
     logger.info("Labels updated successfully")
 
 
 async def insert_preprocessed_data(session: AsyncSession) -> None:
     logger.info(f"Inserting data from btc_ohlcv to btc_preprocessed")
 
-    # Insert data from btc_ohlcv into btc_preprocessed for the given time range
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
-            SELECT time, open, high, low, close, volume
-            FROM btc_ohlcv
-            ON CONFLICT (time) DO UPDATE
-            SET open = EXCLUDED.open,
-                high = EXCLUDED.high,
-                low = EXCLUDED.low,
-                close = EXCLUDED.close,
-                volume = EXCLUDED.volume;
-            """
-        )
+    query = text(
+        f"""
+        INSERT INTO btc_preprocessed (time, open, high, low, close, volume)
+        SELECT time, open, high, low, close, volume
+        FROM btc_ohlcv
+        ON CONFLICT (time) DO UPDATE
+        SET open = EXCLUDED.open,
+            high = EXCLUDED.high,
+            low = EXCLUDED.low,
+            close = EXCLUDED.close,
+            volume = EXCLUDED.volume;
+    """
     )
 
-    await session.commit()
+    await execute_with_retry(session, query)
     logger.info("Data inserted successfully from btc_ohlcv to btc_preprocessed")
 
 
 async def preprocess_data(async_context: dict):
-    db_uri = Variable.get("db_uri")
+    db_uri = Variable.get("db_uri").replace("postgresql://", "postgresql+asyncpg://")
     new_time = async_context["new_time"]
     past_new_time = async_context["past_new_time"]
 
     # Database connection setup
-    engine = create_async_engine(db_uri, future=True)
+    engine = create_async_engine(db_uri, future=True, pool_size=10, max_overflow=5)
     SessionLocal = sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False
     )

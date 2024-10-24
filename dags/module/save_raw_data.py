@@ -244,7 +244,7 @@ async def delete_old_data(session: AsyncSession) -> None:
 async def collect_and_load_data_fn():
     # Database connection details
     db_uri = Variable.get("db_uri").replace("postgresql://", "postgresql+asyncpg://")
-    engine = create_async_engine(db_uri, future=True)
+    engine = create_async_engine(db_uri, future=True, pool_size=10, max_overflow=5)
     SessionLocal = sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False
     )
