@@ -1,4 +1,4 @@
-from . import create_table, save_raw_data, preprocess, classification
+from . import create_table, save_raw_data, preprocess, classification, model_version
 
 all = [
     "create_table_fn",

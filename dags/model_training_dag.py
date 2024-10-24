@@ -9,9 +9,11 @@ from airflow.sensors.external_task import ExternalTaskSensor
 
 from dags.module.classification import (
     train_catboost_model_fn,
+    get_importance,
+)
+from dags.module.model_version import (
     create_model_version,
     transition_model_stage,
-    get_importance,
 )
 from airflow.models import Variable
 
@@ -57,7 +59,6 @@ def model_training_pipeline():
         failed_states=["failed", "skipped"],
         mode="poke",
         timeout=1800,
-        
         poke_interval=30,  # 60초마다 감지
         execution_date_fn=get_closest_execution_date,
     )
@@ -91,6 +92,6 @@ def model_training_pipeline():
         >> transition_model_task
         >> end_task
     )
-    
+
 
 model_training_pipeline()
