@@ -4,5 +4,5 @@ all = [
     "create_table_fn",
     "save_raw_data_from_API_fn",
     "preprocess_data_fn",
-    "train_catboost_model_fn",
+    "collect_and_load_data_fn",
 ]

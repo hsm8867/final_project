@@ -6,17 +6,20 @@ from airflow.utils.trigger_rule import TriggerRule
 from dags.module.delay import delay_start_10
 from dags.module.create_table import create_table_fn
 from dags.module.save_raw_data import (
-    collect_and_load_data,
+    collect_and_load_data_fn,
 )
 from dags.module.preprocess import preprocess_data_fn
 from airflow.models import Variable
 import asyncio
 
+
 def sync_collect_and_load_data():
-    asyncio.run(collect_and_load_data())
+    asyncio.run(collect_and_load_data_fn())
+
 
 def sync_preprocess_data_fn(**context):
     asyncio.run(preprocess_data_fn(**context))
+
 
 @dag(
     dag_id="data_pipeline",
@@ -66,5 +69,6 @@ def data_pipeline():
         >> preprocess_task
         >> end_task
     )
-    
+
+
 data_pipeline()
