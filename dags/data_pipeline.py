@@ -57,6 +57,7 @@ def data_pipeline():
         task_id="preprocess_data",
         python_callable=preprocess_data_fn,
         trigger_rule=TriggerRule.ALL_DONE,
+        execution_timeout=timedelta(minutes=60),
     )
 
     end_task = EmptyOperator(task_id="end_task", trigger_rule=TriggerRule.ALL_DONE)
