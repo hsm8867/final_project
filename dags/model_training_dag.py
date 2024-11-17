@@ -37,8 +37,8 @@ def get_closest_execution_date(execution_date, session=None, **kwargs):
 @dag(
     dag_id="model_training_pipeline",
     schedule_interval="0 0 * * *",  # 매일 utc기준 00시에 실행 (똑같이 딜레이10초)
-    start_date=datetime(2024, 6, 27, 0, 0),
-    catchup=True,
+    start_date=datetime(2024, 11, 17, 0, 0),
+    catchup=False,
     default_args={
         "owner": "admin",
         "retries": 3,

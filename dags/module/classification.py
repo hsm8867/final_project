@@ -20,6 +20,7 @@ import pytz
 from sqlalchemy import text
 import boto3
 from urllib.parse import urlparse
+import os
 
 
 # uvloop를 기본 이벤트 루프로 설정
@@ -56,6 +57,8 @@ async def load_data(engine: AsyncSession) -> pd.DataFrame:
 
 def train_catboost_model_fn(**context: dict) -> None:
     s = time.time()
+    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     study_and_experiment_name = "btc_catboost_alpha"
     mlflow.set_experiment(study_and_experiment_name)
     experiment = mlflow.get_experiment_by_name(study_and_experiment_name)
@@ -68,7 +71,10 @@ def train_catboost_model_fn(**context: dict) -> None:
     ti.xcom_push(key="db_uri", value=db_uri)
     # 데이터 로드
     engine = create_async_engine(
-        db_uri.replace("postgresql", "postgresql+asyncpg"), future=True
+        db_uri.replace("postgresql", "postgresql+asyncpg"),
+        future=True,
+        pool_size=5,
+        max_overflow=10,
     )
 
     df = asyncio.run(load_data(engine))
