@@ -14,6 +14,12 @@ from sqlalchemy import Column, DateTime, Integer, Float
 from sqlalchemy import text, select, func
 from typing import Dict
 
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+import uvloop
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -70,8 +76,8 @@ async def exponential_backoff_retry(session, url, headers, max_retries=5):
 async def fetch_ohlcv_data_in_parallel(
     session,
     market: str,
-    start_time: str,
-    end_time: str,
+    start_time: datetime,
+    end_time: datetime,
     count: int,
     minutes: int,
     max_retries: int = 5,
@@ -90,8 +96,15 @@ async def fetch_ohlcv_data_in_parallel(
     )
 
     # Break down the time range into smaller intervals and create parallel tasks
-    current_time = datetime.fromisoformat(end_time)
-    while current_time > datetime.fromisoformat(start_time):
+    current_time = (
+        end_time if isinstance(end_time, datetime) else datetime.fromisoformat(end_time)
+    )
+    start_time = (
+        start_time
+        if isinstance(start_time, datetime)
+        else datetime.fromisoformat(start_time)
+    )
+    while current_time > start_time:
         to_time = current_time.strftime("%Y-%m-%dT%H:%M:%S")
         url = f"https://api.upbit.com/v1/candles/minutes/{minutes}?market={market}&to={to_time}&count={count}"
         logger.info(
@@ -188,7 +201,7 @@ async def fetch_one_year_of_data(
 
     if data:
         # Insert data into the database
-        await insert_data_into_db(data, session)
+        await insert_data_into_db_batched(data, session)
     else:
         logger.info("No more data to fetch.")
 
@@ -196,9 +209,7 @@ async def fetch_one_year_of_data(
 async def delete_old_data(session: AsyncSession) -> None:
     try:
         # Get the most recent time in the table (latest row)
-        latest_query = (
-            select(func.max(BtcOhlcv.time)).order_by(BtcOhlcv.time.desc()).limit(1)
-        )
+        latest_query = select(func.max(BtcOhlcv.time))
         latest_result = await session.execute(latest_query)
         latest_time = latest_result.scalar()
 
@@ -241,34 +252,39 @@ async def delete_old_data(session: AsyncSession) -> None:
 
 
 # Main function to fetch and insert data
-async def collect_and_load_data_fn():
-    # Database connection details
-    db_uri = Variable.get("db_uri").replace("postgresql://", "postgresql+asyncpg://")
-    engine = create_async_engine(db_uri, future=True, pool_size=10, max_overflow=5)
-    SessionLocal = sessionmaker(
-        bind=engine, class_=AsyncSession, expire_on_commit=False
-    )
+async def collect_and_load_data_fn(**context):
+    async def main():
+        hook = PostgresHook(postgres_conn_id="POSTGRES_DEFAULT")
+        db_uri = hook.get_uri().replace("postgresql://", "postgresql+asyncpg://")
+        engine = create_async_engine(db_uri, future=True, pool_size=10, max_overflow=5)
+        SessionLocal = sessionmaker(
+            bind=engine, class_=AsyncSession, expire_on_commit=False
+        )
 
-    async with aiohttp.ClientSession() as aiohttp_session:
-        async with SessionLocal() as session:
-            # Check if there is a need to fetch one year of historical data
-            await fetch_one_year_of_data(session, aiohttp_session)
+        async with aiohttp.ClientSession() as aiohttp_session:
+            async with SessionLocal() as session:
+                # 데이터 수집 및 삽입 로직
+                await fetch_one_year_of_data(session, aiohttp_session)
 
-            # After historical data, start fetching the latest 5-minute data
-            to_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-            data = await fetch_ohlcv_data_in_parallel(
-                aiohttp_session,
-                market="KRW-BTC",
-                start_time=to_time,
-                end_time=to_time,
-                count=200,
-                minutes=5,
-            )
-            if data:
-                # Insert into the database
-                await insert_data_into_db_batched(data, session)
+                end_time = datetime.now()
+                start_time = end_time - timedelta(days=365)
+                data = await fetch_ohlcv_data_in_parallel(
+                    aiohttp_session,
+                    market="KRW-BTC",
+                    start_time=start_time,
+                    end_time=end_time,
+                    count=200,
+                    minutes=5,
+                )
 
-                # After inserting new data, delete data older than one year
-                await delete_old_data(session)
-            else:
-                logger.info("No new data to insert.")
+                if data:
+                    await insert_data_into_db_batched(data, session)
+                    await delete_old_data(session)
+                else:
+                    logger.info("No new data to insert.")
+
+    await main()
+
+
+def collect_and_load_data_sync(**context):
+    asyncio.run(collect_and_load_data_fn(**context))

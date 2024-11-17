@@ -31,6 +31,8 @@ import asyncio
 import uvloop
 import time
 
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
 # uvloop를 기본 이벤트 루프로 설정
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -100,48 +102,6 @@ async def delete_old_data_from_preprocessed(session: AsyncSession) -> None:
         await session.rollback()
         logger.error(f"Failed to delete old data: {e}")
         raise e
-
-
-async def get_first_and_last_time(
-    session: AsyncSession, new_time: str, past_new_time: str
-):
-
-    if new_time is None:
-        # If new_time is None, retrieve the latest available time from the database
-        print("new_time is None, retrieving the latest time from the database...")
-        latest_query = select(func.max(text("time"))).select_from(text("btc_ohlcv"))
-        result = await session.execute(latest_query)
-        new_time = result.scalar()
-        if new_time is None:
-            raise ValueError(
-                "No data found in the raw data table, and new_time is not provided."
-            )
-        else:
-            new_time = new_time.isoformat()  # Convert it to ISO string format
-
-    # Log the type of new_time for debugging
-    print(f"new_time: {new_time}, type: {type(new_time)}")
-
-    # Convert time strings to datetime objects
-    last_time = datetime.fromisoformat(new_time)
-
-    # Calculate one year ago from last_time
-    one_year_ago = last_time - timedelta(days=365)
-
-    # Check if there is data for one year ago
-    earliest_query = select(func.min(BtcOhlcv.time)).where(
-        BtcOhlcv.time >= one_year_ago
-    )
-    result = await session.execute(earliest_query)
-    first_time = result.scalar()
-
-    if not first_time:
-        # If there's no data from one year ago, retrieve the most recent data
-        earliest_query = select(func.min(BtcOhlcv.time))
-        result = await session.execute(earliest_query)
-        first_time = result.scalar()
-
-    return first_time, last_time
 
 
 async def add_moving_average(
@@ -281,14 +241,19 @@ async def insert_preprocessed_data(session: AsyncSession) -> None:
     """
     )
 
-    await execute_with_retry(session, query)
-    logger.info("Data inserted successfully from btc_ohlcv to btc_preprocessed")
+    try:
+        await execute_with_retry(session, query)
+        logger.info("Data inserted/updated successfully in btc_preprocessed")
+    except Exception as e:
+        logger.error(f"Error inserting data into btc_preprocessed: {e}")
+        raise e
 
 
 async def preprocess_data(async_context: dict):
-    db_uri = Variable.get("db_uri").replace("postgresql://", "postgresql+asyncpg://")
-    new_time = async_context["new_time"]
-    past_new_time = async_context["past_new_time"]
+    hook = PostgresHook(postgres_conn_id="POSTGRES_DEFAULT")
+    db_uri = hook.get_uri().replace("postgresql://", "postgresql+asyncpg://")
+    start_time = async_context["start_time"]
+    end_time = async_context["end_time"]
 
     # Database connection setup
     engine = create_async_engine(db_uri, future=True, pool_size=10, max_overflow=5)
@@ -298,17 +263,13 @@ async def preprocess_data(async_context: dict):
 
     async with SessionLocal() as session:
         # Get the dynamic first_time and last_time based on the new_time and past_new_time
-        first_time, last_time = await get_first_and_last_time(
-            session, new_time, past_new_time
-        )
-
         await insert_preprocessed_data(session)
 
         # Call all preprocessing functions
-        await add_moving_average(session, first_time, last_time)
-        await add_rsi(session, first_time, last_time)
-        await add_rsi_over(session, first_time, last_time)
-        await update_labels(session, first_time, last_time)
+        await add_moving_average(session, start_time, end_time)
+        await add_rsi(session, start_time, end_time)
+        await add_rsi_over(session, start_time, end_time)
+        await update_labels(session, start_time, end_time)
 
         # After preprocessing, delete data older than one year from the most recent row in btc_preprocessed
         await delete_old_data_from_preprocessed(session)
@@ -316,30 +277,33 @@ async def preprocess_data(async_context: dict):
 
 def preprocess_data_fn(**context) -> None:
     s = time.time()
+    hook = PostgresHook(postgres_conn_id="POSTGRES_DEFAULT")
+    db_uri = hook.get_uri().replace("postgresql://", "postgresql+asyncpg://")
     ti = context["ti"]
-    db_uri = ti.xcom_pull(key="db_uri", task_ids="create_table")
     minutes = ti.xcom_pull(key="minutes", task_ids="save_raw_data_from_UPBIT_API")
-    initial_insert = ti.xcom_pull(
-        key="initial_insert", task_ids="save_raw_data_from_UPBIT_API"
-    )
 
-    new_time = ti.xcom_pull(key="new_time", task_ids="save_raw_data_from_UPBIT_API")
-
-    past_new_time = ti.xcom_pull(
-        key="past_new_time", task_ids="save_raw_data_from_UPBIT_API"
-    )
-
-    current_time = ti.xcom_pull(
-        key="current_time", task_ids="save_raw_data_from_UPBIT_API"
-    )
+    start_time = ti.xcom_pull(key="start_time", task_ids="save_raw_data_from_UPBIT_API")
+    end_time = ti.xcom_pull(key="end_time", task_ids="save_raw_data_from_UPBIT_API")
+    if start_time is None or end_time is None:
+        logger.warning("start_time or end_time is None. Setting default time range.")
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=365)
+    else:
+        # XCom에서 가져온 값이 문자열이면 datetime 객체로 변환
+        start_time = (
+            datetime.fromisoformat(start_time)
+            if isinstance(start_time, str)
+            else start_time
+        )
+        end_time = (
+            datetime.fromisoformat(end_time) if isinstance(end_time, str) else end_time
+        )
 
     # 비동기 함수 호출 시 전달할 context 생성(XCom은 JSON직렬화를 요구해서 그냥 쓸려고하면 비동기함수와는 호환이 안됨)
     async_context = {
         "db_uri": db_uri,
-        "initial_insert": initial_insert,
-        "new_time": new_time,
-        "past_new_time": past_new_time,
-        "current_time": current_time,
+        "start_time": start_time,
+        "end_time": end_time,
         "minutes": minutes,
     }
 
@@ -357,6 +321,9 @@ def preprocess_data_fn(**context) -> None:
     logger.info(
         f"Memory usage: {memory_usage / (1024 * 1024):.2f} MB, CPU usage: {cpu_usage:.2f}%"
     )
+    logger.info(f"Start time: {start_time}, End time: {end_time}")
+    logger.info(f"Time difference: {(end_time - start_time).days} days")
+
     e = time.time()
     es = e - s
     logger.info(f"Total working time : {es:.4f} sec")

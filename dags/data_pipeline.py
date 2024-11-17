@@ -6,19 +6,11 @@ from airflow.utils.trigger_rule import TriggerRule
 from dags.module.delay import delay_start_10
 from dags.module.create_table import create_table_fn
 from dags.module.save_raw_data import (
-    collect_and_load_data_fn,
+    collect_and_load_data_sync,
 )
 from dags.module.preprocess import preprocess_data_fn
 from airflow.models import Variable
 import asyncio
-
-
-def sync_collect_and_load_data():
-    asyncio.run(collect_and_load_data_fn())
-
-
-def sync_preprocess_data_fn(**context):
-    asyncio.run(preprocess_data_fn(**context))
 
 
 @dag(
@@ -49,7 +41,7 @@ def data_pipeline():
 
     save_data_task = PythonOperator(
         task_id="save_raw_data_from_UPBIT_API",
-        python_callable=sync_collect_and_load_data,
+        python_callable=collect_and_load_data_sync,
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
